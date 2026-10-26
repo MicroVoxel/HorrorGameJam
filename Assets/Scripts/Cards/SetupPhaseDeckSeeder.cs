@@ -2,12 +2,9 @@
 using UnityEngine;
 
 /// <summary>
-/// แจกการ์ดเริ่มต้นในช่วง Phase 1 (Setup & Dawn):
-/// - แจกการ์ดศาลเจ้า (TowerDefenseBase) ตามระดับความยาก (เช่น 2 ใบ)
-/// - แจกการ์ดรังผีเริ่มต้น (TowerSpawnable) จำนวน 2 ใบ
-///
-/// ไม่ต้องล็อก Spacebar เองอีกแล้ว: GameState เริ่มที่ Setup อยู่แล้ว
-/// และจะเปลี่ยนเป็น Playing เองเมื่อวางศาลเจ้าครบตามที่ตั้งไว้ที่นี่
+/// แจกการ์ดเริ่มต้นตามกติกา GDD v2 (2.1 และ 5.1):
+/// - ในเฟส Dawn: แจกเฉพาะการ์ดศาลเจ้าตามจำนวน GameRulesData.RequiredShrines เท่านั้น (ยังไม่มีการ์ดอื่น)
+/// - เมื่อเริ่ม Planning ของ Round 1: แจกการ์ดรังผีเริ่มต้นตามจำนวน GameRulesData.StartingSpawnerCards
 /// </summary>
 [DisallowMultipleComponent]
 public class SetupPhaseDeckSeeder : MonoBehaviour
@@ -15,12 +12,16 @@ public class SetupPhaseDeckSeeder : MonoBehaviour
     [Header("References (เว้นว่างได้ ระบบจะใช้ CardDeckController.Instance)")]
     [SerializeField] private CardDeckController deckController;
 
-    [Header("Initial Shrine Cards (บังคับวางให้ครบก่อนปลดล็อก Spacebar)")]
+    [Header("Dawn Shrine Cards (จำนวนอ่านจาก GameRulesData.RequiredShrines)")]
     [SerializeField] private CardData shrineCardData;
-    [SerializeField] private int shrineCardCount = 2;
+    [Tooltip("ค่าสำรองกรณีไม่มี GameStateManager ในฉาก")]
+    [SerializeField, Min(1)] private int fallbackShrineCardCount = 2;
 
-    [Header("Initial Spawner Cards (รังผีเริ่มต้น 2 ใบ)")]
+    [Header("Round 1 Spawner Cards Pool (จำนวนที่แจกอ่านจาก GameRulesData.StartingSpawnerCards)")]
     [SerializeField] private List<CardData> initialSpawnerCards = new List<CardData>();
+
+    private bool dealtDawnShrines;
+    private bool dealtStartingSpawners;
 
     private void Start()
     {
@@ -29,39 +30,100 @@ public class SetupPhaseDeckSeeder : MonoBehaviour
             deckController = CardDeckController.Instance;
         }
 
-        DealInitialSetupHand();
-    }
-
-    [ContextMenu("Deal Initial Setup Hand")]
-    public void DealInitialSetupHand()
-    {
-        if (ObjectiveTracker.Instance != null)
+        if (GameStateManager.Instance != null)
         {
-            ObjectiveTracker.Instance.SetRequiredShrinesCount(shrineCardCount);
+            GameStateManager.Instance.OnRoundStarted += HandleRoundStarted;
         }
 
+        DealDawnShrineHand();
+
+        // กรณีเริ่มฉากมาแล้วอยู่ใน Planning ของ Round 1 แล้ว
+        if (GameStateManager.IsPlanning && GameStateManager.CurrentRound == 1)
+        {
+            DealRoundOneSpawnerCards();
+        }
+    }
+
+    private void OnDestroy()
+    {
+        if (GameStateManager.Instance != null)
+        {
+            GameStateManager.Instance.OnRoundStarted -= HandleRoundStarted;
+        }
+    }
+
+    private void HandleRoundStarted(int round, int turns)
+    {
+        if (round == 1)
+        {
+            DealRoundOneSpawnerCards();
+        }
+    }
+
+    /// <summary>แจกเฉพาะการ์ดศาลเจ้าในเฟส Dawn ตามจำนวน RequiredShrines ใน GameRulesData</summary>
+    [ContextMenu("Deal Dawn Shrine Hand")]
+    public void DealDawnShrineHand()
+    {
+        if (dealtDawnShrines) return;
+        dealtDawnShrines = true;
+
+        int requiredShrines = GameStateManager.Instance != null
+            ? GameStateManager.Instance.Rules.RequiredShrines
+            : Mathf.Max(1, fallbackShrineCardCount);
+
+        if (ObjectiveTracker.Instance != null)
+        {
+            ObjectiveTracker.Instance.SetRequiredShrinesCount(requiredShrines);
+        }
+
+        if (deckController == null) deckController = CardDeckController.Instance;
         if (deckController == null)
         {
-            Debug.LogWarning("[SetupPhaseDeckSeeder] ไม่พบ CardDeckController ในฉาก!");
+            Debug.LogWarning("[SetupPhaseDeckSeeder] CardDeckController not found in scene!");
             return;
         }
 
-        // 1. แจกการ์ดศาลเจ้าตามจำนวนที่กำหนด
         if (shrineCardData != null)
         {
-            for (int i = 0; i < shrineCardCount; i++)
+            for (int i = 0; i < requiredShrines; i++)
             {
                 deckController.AddCardToHand(shrineCardData);
             }
         }
+    }
 
-        // 2. แจกการ์ดรังผีเริ่มต้น
+    /// <summary>แจกการ์ดรังผีเริ่มต้นเมื่อเข้าสู่ Planning ของ Round 1 ตามจำนวน StartingSpawnerCards ใน GameRulesData</summary>
+    [ContextMenu("Deal Round 1 Spawner Cards")]
+    public void DealRoundOneSpawnerCards()
+    {
+        if (dealtStartingSpawners) return;
+        dealtStartingSpawners = true;
+
+        if (deckController == null) deckController = CardDeckController.Instance;
+        if (deckController == null || initialSpawnerCards == null || initialSpawnerCards.Count == 0) return;
+
+        int spawnerCount = GameStateManager.Instance != null
+            ? GameStateManager.Instance.Rules.StartingSpawnerCards
+            : initialSpawnerCards.Count;
+
+        int validCardsInPool = 0;
         for (int i = 0; i < initialSpawnerCards.Count; i++)
         {
-            if (initialSpawnerCards[i] != null)
-            {
-                deckController.AddCardToHand(initialSpawnerCards[i]);
-            }
+            if (initialSpawnerCards[i] != null) validCardsInPool++;
+        }
+
+        if (validCardsInPool == 0) return;
+
+        int dealt = 0;
+        int cursor = 0;
+        while (dealt < spawnerCount)
+        {
+            CardData data = initialSpawnerCards[cursor % initialSpawnerCards.Count];
+            cursor++;
+            if (data == null) continue;
+
+            deckController.AddCardToHand(data);
+            dealt++;
         }
     }
 }

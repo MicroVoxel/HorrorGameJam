@@ -68,6 +68,19 @@ public class AbilityData : ScriptableObject
         return UITextData.Format(description, "n", value);
     }
 
+    /// <summary>สร้าง AbilityData ชั่วคราวในหน่วยความจำ (ใช้เป็น Fallback เมื่อของถวายมอบ Keyword แต่ไม่ได้ลาก SO ใส่)</summary>
+    public static AbilityData CreateRuntime(AbilityKeyword keyword, string displayName, string description, int value = 1)
+    {
+        AbilityData instance = CreateInstance<AbilityData>();
+        instance.hideFlags = HideFlags.HideAndDontSave;
+        instance.keywordId = keyword.ToString().ToLowerInvariant();
+        instance.displayName = displayName;
+        instance.description = description;
+        instance.keyword = keyword;
+        instance.value = value;
+        return instance;
+    }
+
     public static AbilityTrigger DefaultTrigger(AbilityKeyword k)
     {
         switch (k)

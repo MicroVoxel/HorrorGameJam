@@ -133,6 +133,7 @@ public class TowerSpawnable : MonoBehaviour, ITurnActor
         if (walkable != null)
         {
             walkable.InitializeOnPath(pathManager, chosenIndex);
+            GiveLateSpawnItsTurn(walkable); // FIX บัก 3
         }
         else
         {
@@ -140,6 +141,18 @@ public class TowerSpawnable : MonoBehaviour, ITurnActor
         }
 
         return spawned;
+    }
+
+    // FIX บัก 3: OnTurnStart (ตั้ง AP) ถูกเรียกก่อน Spawner Step ผีที่เสกใน Spawner Step จึงมี AP = 0
+    // ถ้ากำลังรันเทิร์นอยู่ใน Resolution ให้เรียก OnTurnStart ให้ผีตัวนี้ทันที จะได้ทำ action ใน Entity Step เทิร์นเดียวกัน
+    // (ตอนวางรังใน Planning IsRunning เป็น false จึงไม่เข้าเงื่อนไข ผีจะได้ AP ตามปกติตอน OnTurnStart ของเทิร์น 1)
+    private static void GiveLateSpawnItsTurn(EntityWalkable walkable)
+    {
+        TurnManager tm = TurnManager.Instance;
+        if (walkable == null || tm == null) return;
+        if (!GameStateManager.IsResolution || !tm.IsRunning || tm.Context == null) return;
+
+        walkable.OnTurnStart(tm.Context);
     }
 
     private void HandleSpawnedEntityDied(EntityBase deadEntity)

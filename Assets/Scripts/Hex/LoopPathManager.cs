@@ -6,7 +6,7 @@ public enum LoopPresetType
     Random,         // สุ่มเลือก 1 ใน 3 รูปแบบด้านล่างตอนเริ่มเกม
     OLoop,          // วงแหวนหกเหลี่ยมมาตรฐาน (O-Loop)
     HourglassLoop,  // วงแหวนคอดกลางรูปนาฬิกาทราย (Hourglass)
-    Figure8Loop     // วงแหวนเลขแปด (Figure-8)
+    Figure8Loop     // วงแหวนทรงเลขแปด (คอดกลางแนวนอน)
 }
 
 /// <summary>
@@ -74,8 +74,11 @@ public class LoopPathManager : SingletonBehaviour<LoopPathManager>
         for (int r = -halfH; r <= halfH; r++)
         {
             int rOffset = Mathf.FloorToInt(r / 2.0f);
-            int qMin = Mathf.Min(-halfW - rOffset, -halfW);
-            int qMax = Mathf.Max(halfW - rOffset, halfW);
+
+            // FIX บัก 8: ช่วง q ต้องเลื่อนตาม rOffset ให้แถวเรียงเป็นสี่เหลี่ยมในโลกจริง (ทุกแถวกว้าง gridWidth ช่อง)
+            // เดิมใช้ Min/Max ผสมกับ halfW ทำให้บางแถวยาวเกินและกระดานเอียงเป็นสี่เหลี่ยมด้านขนาน
+            int qMin = -halfW - rOffset;
+            int qMax = halfW - rOffset;
 
             for (int q = qMin; q <= qMax; q++)
             {
@@ -149,7 +152,54 @@ public class LoopPathManager : SingletonBehaviour<LoopPathManager>
                     pathIdx++;
                 }
             }
+            else
+            {
+                // FIX บัก 2: พิกัดของ Preset อยู่นอกกระดาน (เช่น ตั้ง gridWidth/Height เล็กเกินไป)
+                Debug.LogWarning($"[LoopPathManager] Preset {chosen}: พิกัด {coords} อยู่นอกกระดาน จะถูกข้าม ทางเดินจะขาด");
+            }
         }
+
+        ValidatePathContinuity(chosen);
+    }
+
+    // FIX บัก 2: ตรวจว่าช่องที่อยู่ติดกันใน path (รวมช่องสุดท้ายวนกลับช่องแรก) เป็นเพื่อนบ้านกันจริง
+    /// <summary>
+    /// เตือนใน Console เมื่อทางเดินมีช่องที่ไม่ติดกัน (DistanceTo != 1) หรือมีช่องน้อยเกินไป
+    /// คืน true ถ้าทางเดินต่อกันเป็นวงครบ ใช้ ContextMenu ตรวจกระดานที่สร้างไว้แล้วใน Editor ได้
+    /// </summary>
+    [ContextMenu("Validate Path Continuity")]
+    public bool ValidatePathContinuity()
+    {
+        return ValidatePathContinuity(pathPreset);
+    }
+
+    private bool ValidatePathContinuity(LoopPresetType presetLabel)
+    {
+        int n = pathTiles.Count;
+        if (n < 3)
+        {
+            Debug.LogWarning($"[LoopPathManager] Preset {presetLabel}: ทางเดินมีเพียง {n} ช่อง ไม่พอสร้างลูป");
+            return false;
+        }
+
+        bool ok = true;
+        for (int i = 0; i < n; i++)
+        {
+            HexTile a = pathTiles[i];
+            HexTile b = pathTiles[(i + 1) % n];
+            if (a == null || b == null) continue;
+
+            int dist = a.Coordinates.DistanceTo(b.Coordinates);
+            if (dist != 1)
+            {
+                ok = false;
+                Debug.LogWarning(
+                    $"[LoopPathManager] Preset {presetLabel}: ช่อง path #{i} {a.Coordinates} → #{(i + 1) % n} {b.Coordinates} " +
+                    $"ห่างกัน {dist} ช่อง (ต้องเป็น 1) ผีจะกระโดดข้ามช่อง", a);
+            }
+        }
+
+        return ok;
     }
 
     private List<HexCoordinates> GetRingCoordinates(int radius)
@@ -206,32 +256,34 @@ public class LoopPathManager : SingletonBehaviour<LoopPathManager>
     }
 
     /// <summary>
-    /// Preset ทางเดินทรงเลข 8 (Figure-8 Loop) วนซ้าย-ขวาผ่านจุดศูนย์กลาง
+    /// Preset ทางเดินทรงเลข 8 (Figure-8) เป็นลูปเดียวที่คอดตรงกลางแนวนอน: ปีกซ้ายและปีกขวา
+    /// เชื่อมกันด้วยคอบน (0,1) และคอล่าง (0,-1)/(1,-1) โดยมีช่อง (0,0) และ (1,0) เป็นพื้นดินอยู่กลางลูป
+    ///
+    /// FIX บัก 2: ของเดิมพยายามให้ทางเดินผ่านจุดกลางสองรอบ (ตัดกันแบบเลข 8 จริง) ซึ่งทำไม่ได้
+    /// เพราะ 1 ช่องมี PathIndex ได้ค่าเดียว (ช่องซ้ำถูกข้าม) และมีสองรอยต่อที่ห่างกัน 2 ช่อง
+    /// แบบใหม่ทุกคู่ที่อยู่ติดกัน (รวมช่องสุดท้ายวนกลับช่องแรก) ห่างกัน 1 ช่องพอดี
     /// </summary>
     private List<HexCoordinates> GetFigure8Coordinates()
     {
         return new List<HexCoordinates>
         {
-            // ปีกขวา
-            new HexCoordinates(1, -1),
-            new HexCoordinates(2, -2),
-            new HexCoordinates(3, -2),
-            new HexCoordinates(4, -2),
-            new HexCoordinates(4, -1),
-            new HexCoordinates(3, 0),
-            new HexCoordinates(2, 1),
-            new HexCoordinates(1, 1),
-            // จุดตัดตรงกลาง
-            new HexCoordinates(0, 0),
+            // คอบน
+            new HexCoordinates(0, 1),
             // ปีกซ้าย
             new HexCoordinates(-1, 1),
-            new HexCoordinates(-2, 2),
-            new HexCoordinates(-3, 2),
-            new HexCoordinates(-4, 2),
-            new HexCoordinates(-4, 1),
-            new HexCoordinates(-3, 0),
-            new HexCoordinates(-2, -1),
-            new HexCoordinates(-1, -1)
+            new HexCoordinates(-2, 1),
+            new HexCoordinates(-2, 0),
+            new HexCoordinates(-1, -1),
+            // คอล่าง
+            new HexCoordinates(0, -1),
+            new HexCoordinates(1, -1),
+            // ปีกขวา
+            new HexCoordinates(2, -1),
+            new HexCoordinates(3, -1),
+            new HexCoordinates(3, 0),
+            new HexCoordinates(2, 1),
+            new HexCoordinates(1, 1)
+            // (1,1) -> (0,1) ปิดลูปกลับช่องแรก
         };
     }
 

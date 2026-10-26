@@ -12,6 +12,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: e04cb3d1cd3e5d947b6316696facbb79, type: 3}
   m_Name: Utillity
   m_EditorClassIdentifier: Assembly-CSharp::OfferingItemData
+  schemaVersion: 2
   itemId: Utillity
   itemName: Utillity
   description: Utillity
@@ -19,11 +20,25 @@ MonoBehaviour:
   freshIcon: {fileID: 0}
   rottenIcon: {fileID: 0}
   decayLoops: 2
-  freshShrineDefenseBonus: 2
-  freshShrineDamageReductionPercent: 0.2
-  freshTowerAttackSpeedMultiplier: 0.75
+  freshGrantTowerDoubleStrike: 0
+  freshTowerAbility: {fileID: 0}
+  freshShrineDamageReductionPercent: 0
+  freshShrineDefenseBonus: 0
+  freshPushLeadSpiritTiles: 0
+  freshPushEveryNTurns: 2
+  freshEntityAttackMultiplier: 1
+  freshTowerIgnoreBlocking: 1
+  freshTowerAttackSpeedMultiplier: 1
   spawnRetaliationLanternOnFresh: 1
-  rottenEntityAttackMultiplier: 1.5
-  rottenEntitySpeedMultiplier: 1.35
-  triggersFrenzy: 1
-  stripShrineArmor: 1
+  rottenGrantEntityLifedrain: 0
+  rottenEntityAbility: {fileID: 0}
+  rottenEntityMoveBonus: 0
+  stripShrineArmor: 0
+  rottenShrinePoisonDamagePerTurn: 0
+  rottenMutateLeadSpiritImmediately: 0
+  rottenTowerPatternSizeDelta: 0
+  rottenTowersSkipRound: 1
+  rottenTowersSkipDurationRounds: 1
+  rottenEntityAttackMultiplier: 1
+  rottenEntitySpeedMultiplier: 1
+  triggersFrenzy: 0

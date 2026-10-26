@@ -78,6 +78,27 @@ public class UITextData : ScriptableObject
     public string altarFresh = "Fresh ({rounds} left)";
     public string altarRotten = "Rotten";
 
+    [Header("Inventory & Swap")]
+    public string inventoryNextDiscardHint = "Oldest slot: discarded next if backpack overflows.";
+    [Tooltip("Placeholders: {remaining}, {total}")]
+    public string swapQuotaLabel = "Swaps: {remaining} / {total}";
+    public string swapDeniedNotPlanning = "Can only swap spirits during Planning";
+    public string swapDeniedNoQuota = "No formation swaps remaining this round";
+    [Tooltip("Placeholders: {max}")]
+    public string swapDeniedTooFar = "Can only swap spirits within {max} path tiles";
+
+    [Header("Round Summary")]
+    [Tooltip("Placeholders: {round}")]
+    public string summaryTitle = "Round {round} Complete";
+    [Tooltip("Placeholders: {damage}, {remaining}, {total}")]
+    public string summaryShrinesLine = "Shrine damage dealt: {damage}  |  Shrines remaining: {remaining} / {total}";
+    [Tooltip("Placeholders: {died}, {mutated}")]
+    public string summarySpiritsLine = "Spirits fallen: {died}  |  Mutated: {mutated}";
+    [Tooltip("Placeholders: {items}, {cards}")]
+    public string summaryLootLine = "Loot gained: {items} offering(s), {cards} card(s)";
+    [Tooltip("Placeholders: {rotten}, {sticks}")]
+    public string summaryAltarLine = "Rotten this round: {rotten}  |  Incense left: {sticks}";
+
     /// <summary>แทนที่ {key} ด้วยค่า โดยส่งเป็นคู่ key, value ต่อกัน เช่น Format(t, "current", 2, "total", 5)</summary>
     public static string Format(string template, params object[] keyValuePairs)
     {

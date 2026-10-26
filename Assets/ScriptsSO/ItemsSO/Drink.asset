@@ -12,6 +12,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: e04cb3d1cd3e5d947b6316696facbb79, type: 3}
   m_Name: Drink
   m_EditorClassIdentifier: Assembly-CSharp::OfferingItemData
+  schemaVersion: 2
   itemId: Drink
   itemName: Drink
   description: Drink
@@ -19,11 +20,25 @@ MonoBehaviour:
   freshIcon: {fileID: 0}
   rottenIcon: {fileID: 0}
   decayLoops: 2
-  freshShrineDefenseBonus: 2
-  freshShrineDamageReductionPercent: 0.2
-  freshTowerAttackSpeedMultiplier: 0.75
+  freshGrantTowerDoubleStrike: 1
+  freshTowerAbility: {fileID: 0}
+  freshShrineDamageReductionPercent: 0
+  freshShrineDefenseBonus: 0
+  freshPushLeadSpiritTiles: 0
+  freshPushEveryNTurns: 2
+  freshEntityAttackMultiplier: 1
+  freshTowerIgnoreBlocking: 0
+  freshTowerAttackSpeedMultiplier: 1
   spawnRetaliationLanternOnFresh: 1
-  rottenEntityAttackMultiplier: 1.5
-  rottenEntitySpeedMultiplier: 1.35
-  triggersFrenzy: 1
-  stripShrineArmor: 1
+  rottenGrantEntityLifedrain: 1
+  rottenEntityAbility: {fileID: 0}
+  rottenEntityMoveBonus: 1
+  stripShrineArmor: 0
+  rottenShrinePoisonDamagePerTurn: 0
+  rottenMutateLeadSpiritImmediately: 0
+  rottenTowerPatternSizeDelta: 0
+  rottenTowersSkipRound: 0
+  rottenTowersSkipDurationRounds: 1
+  rottenEntityAttackMultiplier: 1
+  rottenEntitySpeedMultiplier: 1
+  triggersFrenzy: 0

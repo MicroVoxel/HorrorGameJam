@@ -133,6 +133,12 @@ public class FormationSwapManager : SingletonBehaviour<FormationSwapManager>
             {
                 draggedWalkable = walkable;
                 dragPlane = new Plane(Vector3.up, walkable.transform.position);
+
+                if (TooltipPanel.Instance != null)
+                {
+                    TooltipData data = HoverRaycaster.BuildEntityTooltip(walkable.Entity);
+                    TooltipPanel.Instance.Lock(this, data);
+                }
                 return;
             }
         }
@@ -153,6 +159,11 @@ public class FormationSwapManager : SingletonBehaviour<FormationSwapManager>
     private void CompleteEntityDrag()
     {
         if (draggedWalkable == null) return;
+
+        if (TooltipPanel.Instance != null)
+        {
+            TooltipPanel.Instance.Unlock(this);
+        }
 
         EntityWalkable dragged = draggedWalkable;
         draggedWalkable = null;
@@ -236,6 +247,11 @@ public class FormationSwapManager : SingletonBehaviour<FormationSwapManager>
 
     private void CancelEntityDrag()
     {
+        if (TooltipPanel.Instance != null)
+        {
+            TooltipPanel.Instance.Unlock(this);
+        }
+
         if (draggedWalkable != null)
         {
             draggedWalkable.SnapBackToCurrentTile();

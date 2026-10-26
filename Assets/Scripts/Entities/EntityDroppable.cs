@@ -3,7 +3,7 @@ using UnityEngine;
 
 /// <summary>
 /// คอมโพเนนต์จัดการการดรอปไอเทมของถวาย (OfferingItemData) และการ์ดแผ่นกระดาน (CardData)
-/// รองรับทั้งการดรอปเมื่อยูนิตตาย (เช่น ตีคนเฝ้าศาลตาย) และการดรอปรางวัลเมื่อผีกระโดดวนครบรอบลูปสำเร็จ!
+/// v2 (4C): ใช้ GameRandom (Seeded RNG) และส่งของดรอปเข้า LootStash เพื่อแจกตอน RoundEnd
 /// </summary>
 [DisallowMultipleComponent]
 [RequireComponent(typeof(EntityBase))]
@@ -32,6 +32,11 @@ public class EntityDroppable : MonoBehaviour
     {
         entityBase = GetComponent<EntityBase>();
         walkable = GetComponent<EntityWalkable>();
+    }
+
+    private void Start()
+    {
+        LootStash.RegisterPools(possibleOfferingDrops, possibleCardDrops);
     }
 
     private void OnEnable()
@@ -76,31 +81,27 @@ public class EntityDroppable : MonoBehaviour
 
     private void TryRollOfferingDrop(float chance, string sourceTag)
     {
-        if (possibleOfferingDrops == null || possibleOfferingDrops.Count == 0) return;
-        if (Random.value > chance) return;
+        if (possibleOfferingDrops == null || possibleOfferingDrops.Count == 0 || chance <= 0f) return;
+        if (!GameRandom.Chance(chance)) return;
 
-        OfferingItemData chosenItem = possibleOfferingDrops[Random.Range(0, possibleOfferingDrops.Count)];
-        if (chosenItem != null && InventorySlotManager.Instance != null)
+        OfferingItemData chosenItem = GameRandom.Pick(possibleOfferingDrops);
+        if (chosenItem != null)
         {
-            InventorySlotManager.Instance.AddItem(chosenItem);
-            Debug.Log($"<color=cyan>[Loot Drop - {sourceTag}]</color> ดรอปของเซ่นไหว้ '{chosenItem.ItemName}' เข้ากระเป๋า!");
+            LootStash.StashOffering(chosenItem, sourceTag);
         }
     }
 
-    private void TryRollCardDrop(float chance, string sourceTag)
+    private void TryRollCardDrop(float baseChance, string sourceTag)
     {
-        if (possibleCardDrops == null || possibleCardDrops.Count == 0) return;
-        if (Random.value > chance) return;
+        if (possibleCardDrops == null || possibleCardDrops.Count == 0 || baseChance <= 0f) return;
 
-        CardData chosenCard = possibleCardDrops[Random.Range(0, possibleCardDrops.Count)];
+        float effectiveChance = Mathf.Clamp01(baseChance + LootStash.GetThreatCardChanceBonus());
+        if (!GameRandom.Chance(effectiveChance)) return;
+
+        CardData chosenCard = GameRandom.Pick(possibleCardDrops);
         if (chosenCard != null)
         {
-            CardDeckController deck = FindAnyObjectByType<CardDeckController>();
-            if (deck != null)
-            {
-                deck.AddCardToHand(chosenCard);
-                Debug.Log($"<color=green>[Card Drop - {sourceTag}]</color> ดรอปการ์ด '{chosenCard.CardName}' เข้ามือ!");
-            }
+            LootStash.StashCard(chosenCard, sourceTag);
         }
     }
 }

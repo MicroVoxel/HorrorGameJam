@@ -8,7 +8,7 @@ using UnityEngine;
 ///
 /// ลำดับใน 1 เทิร์น:
 ///   1. Start of Turn  2. Spawner Step  3. Quick Step  4. Entity Step (หัวขบวนก่อน)
-///   5. Tower Step     6. รอแอนิเมชันที่ปล่อยพร้อมกันให้จบ  7. Cleanup  8. End of Turn
+///   5. Tower Step     6. รอแอนิเมชันที่ปล่อยพร้อมกันให้จบ  7. Last Breath แล้วจึง Cleanup  8. End of Turn
 ///
 /// เริ่มเองเมื่อ GameState เป็น Resolution และเรียก GameStateManager.CompleteResolution() เมื่อครบเทิร์น
 /// ถ้าเกมจบ (Ended) กลางคันจะหยุดทันที
@@ -22,15 +22,19 @@ public class TurnManager : SingletonBehaviour<TurnManager>
     private readonly List<ITurnActor> quickActors = new List<ITurnActor>(16);
 
     private Coroutine resolutionRoutine;
+    private bool isRunning;
     private TurnContext context;
     private int speedIndex = -1;
 
     // ---------- State ----------
-    public bool IsRunning => resolutionRoutine != null;
+    public bool IsRunning => isRunning;
     public TurnContext Context => context;
     public int CurrentTurn => context != null ? context.Turn : 0;
     public int TotalTurns => context != null ? context.TotalTurns : 0;
-    public bool IsFastForward => context != null && context.IsFastForward;
+
+    // FIX บัก 5: อ่านค่า Skip เฉพาะตอนกำลังรันอยู่ ไม่งั้น context เก่าของ Round ก่อนทำให้ปุ่ม Skip ค้างเป็นสีเทา
+    public bool IsFastForward => isRunning && context != null && context.IsFastForward;
+
     public int SpeedIndex => ResolveSpeedIndex();
     public float SpeedMultiplier => GameStateManager.Instance != null
         ? GameStateManager.Instance.Rules.GetSpeedMultiplier(ResolveSpeedIndex())
@@ -46,7 +50,7 @@ public class TurnManager : SingletonBehaviour<TurnManager>
     /// <summary>เทิร์นจบ หลัง Cleanup และ OnTurnEnd ของทุกตัวแล้ว</summary>
     public event Action<int, int> OnTurnEnded;
 
-    /// <summary>ขั้น Cleanup ของเทิร์น: ระบบอื่นเก็บศพ ดรอป เช็กกลายพันธุ์ เช็ก Extinction ผ่าน Event นี้</summary>
+    /// <summary>ขั้น Cleanup ของเทิร์น (หลัง Last Breath จบแล้ว): ระบบอื่นเก็บศพ ดรอป เช็กกลายพันธุ์ เช็ก Victory/Extinction ผ่าน Event นี้</summary>
     public event Action<TurnContext> OnTurnCleanup;
 
     /// <summary>จบ Resolution (true = จบก่อนครบเทิร์นเพราะไม่เหลืออะไรเกิดขึ้นอีก)</summary>
@@ -117,16 +121,18 @@ public class TurnManager : SingletonBehaviour<TurnManager>
     {
         if (newState == GameState.Resolution)
         {
-            if (resolutionRoutine == null)
+            if (!isRunning)
             {
+                isRunning = true; // ตั้งก่อน StartCoroutine เสมอ
                 resolutionRoutine = StartCoroutine(RunResolution());
             }
         }
-        else if (resolutionRoutine != null)
+        else if (isRunning)
         {
             // ออกจาก Resolution กลางคัน (เช่น ชนะหรือแพ้ระหว่างเทิร์น)
-            StopCoroutine(resolutionRoutine);
+            if (resolutionRoutine != null) StopCoroutine(resolutionRoutine);
             resolutionRoutine = null;
+            isRunning = false;
         }
     }
 
@@ -136,7 +142,19 @@ public class TurnManager : SingletonBehaviour<TurnManager>
         int round = GameStateManager.CurrentRound;
         int totalTurns = Mathf.Max(1, GameStateManager.TurnsThisRound);
 
+        // สร้าง context ใหม่ทันที (IsFastForward ของ Round ก่อนจะไม่ค้างมา)
         context = new TurnContext(round, totalTurns, PostLog) { SpeedMultiplier = SpeedMultiplier };
+
+        // รอ 1 เฟรม เพื่อให้ StartCoroutine คืนค่ากลับไปก่อน
+        // และให้ handler อื่นของ OnStateChanged(Resolution) ทำงานครบ ก่อนเริ่มเทิร์นแรก
+        yield return null;
+        if (!GameStateManager.IsResolution)
+        {
+            isRunning = false;
+            resolutionRoutine = null;
+            yield break;
+        }
+
         OnResolutionStarted?.Invoke(round, totalTurns);
 
         bool endedEarly = false;
@@ -157,7 +175,9 @@ public class TurnManager : SingletonBehaviour<TurnManager>
             }
         }
 
+        // ปลดสถานะก่อนเรียก CompleteResolution เสมอ
         resolutionRoutine = null;
+        isRunning = false;
 
         if (GameStateManager.IsResolution)
         {
@@ -193,7 +213,12 @@ public class TurnManager : SingletonBehaviour<TurnManager>
         // 6. รอแอนิเมชันที่ปล่อยพร้อมกันให้จบ
         yield return WaitForAnimations();
 
-        // 7. Cleanup
+        // 7. Last Breath ก่อน แล้วจึง Cleanup
+        // FIX บัก 4: ระเบิด Last Breath (รวมลูกโซ่) ให้เสร็จก่อน เพื่อให้ Victory/Extinction เห็นผลลัพธ์ครบ
+        // ไม่ขึ้นกับว่าระบบไหน subscribe OnTurnCleanup ก่อนกัน
+        AbilityResolver.ResolvePending(context);
+        if (!GameStateManager.IsResolution) yield break;
+
         OnTurnCleanup?.Invoke(context);
         if (!GameStateManager.IsResolution) yield break;
 

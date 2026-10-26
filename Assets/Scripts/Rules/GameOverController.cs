@@ -4,13 +4,11 @@ using UnityEngine.SceneManagement;
 using TMPro;
 
 /// <summary>
-/// ควบคุมสภาวะจบเกม (Victory / Defeat Flow) ตาม GDD:
-/// - ชัยชนะ (Victory): ขบวนผีทำลายศาลเจ้าศักดิ์สิทธิ์ (TowerDefenseBase) ทั้งหมดสำเร็จ
-/// - พ่ายแพ้ (Defeat #1 - Time's Up): ก้านธูปดอกที่ 7 มอดดับลง
-/// - พ่ายแพ้ (Defeat #2 - Extinction): ขบวนผีสูญพันธุ์ ไร้หนทางต่อสู้
-///
-/// การ "หยุดเกม" ทำผ่าน GameState.Ended เท่านั้น (ธูปหยุดเผา / Spacebar ใช้ไม่ได้)
-/// ไม่ต้องไปสั่งปิดระบบอื่นทีละตัวอีกแล้ว
+/// ควบคุมสภาวะจบเกม (Victory / Defeat Flow) ตาม GDD v2:
+/// - ชัยชนะ (Victory): ศาลเจ้าเป้าหมายทั้งหมด HP = 0 (เช็กหลังทุก Cleanup)
+/// - พ่ายแพ้ (Defeat #1 - Time's Up): จบ Round สุดท้ายแล้วยังมีศาลเจ้าเหลือ
+/// - พ่ายแพ้ (Defeat #2 - Extinction): ไม่มีผีบนทาง ไม่มีรังผีบนกระดาน และไม่มีการ์ดรังผีในมือ (เช็กหลังทุก Cleanup)
+/// ข้อความทั้งหมดดึงจาก UITextProvider.Text (UITextData)
 /// </summary>
 [DisallowMultipleComponent]
 public class GameOverController : SingletonBehaviour<GameOverController>
@@ -34,6 +32,8 @@ public class GameOverController : SingletonBehaviour<GameOverController>
     [Header("Scene Navigation")]
     [SerializeField] private string mainMenuSceneName = "MainMenu";
 
+    private bool subscribedToTurns;
+
     public bool IsGameOver => GameStateManager.IsEnded;
 
     protected override void OnSingletonAwake()
@@ -44,17 +44,23 @@ public class GameOverController : SingletonBehaviour<GameOverController>
 
     private void Start()
     {
-        // ชนะ: ObjectiveTracker แจ้งว่าศาลเจ้าถูกทำลายหมด
         if (ObjectiveTracker.Instance != null)
         {
             ObjectiveTracker.Instance.OnAllTargetsDestroyedVictory += TriggerVictory;
         }
 
-        // แพ้ (หมดเวลา): ธูปมอดครบ 7 ดอก
+        if (GameStateManager.Instance != null)
+        {
+            GameStateManager.Instance.OnAllRoundsCompleted += TriggerDefeatByTimeOut;
+        }
+
         if (IncenseGaugeController.Instance != null)
         {
             IncenseGaugeController.Instance.OnAllIncenseExhausted += TriggerDefeatByTimeOut;
         }
+
+        TrySubscribeToTurnCleanup();
+        ApplyButtonLabels();
 
         if (retryButton != null) retryButton.onClick.AddListener(RestartCurrentScene);
         if (mainMenuButton != null) mainMenuButton.onClick.AddListener(LoadMainMenuScene);
@@ -67,16 +73,63 @@ public class GameOverController : SingletonBehaviour<GameOverController>
             ObjectiveTracker.Instance.OnAllTargetsDestroyedVictory -= TriggerVictory;
         }
 
+        if (GameStateManager.Instance != null)
+        {
+            GameStateManager.Instance.OnAllRoundsCompleted -= TriggerDefeatByTimeOut;
+        }
+
         if (IncenseGaugeController.Instance != null)
         {
             IncenseGaugeController.Instance.OnAllIncenseExhausted -= TriggerDefeatByTimeOut;
         }
 
+        if (subscribedToTurns && TurnManager.Instance != null)
+        {
+            TurnManager.Instance.OnTurnCleanup -= HandleTurnCleanup;
+        }
+
         base.OnDestroy();
     }
 
+    private void TrySubscribeToTurnCleanup()
+    {
+        if (subscribedToTurns || TurnManager.Instance == null) return;
+
+        TurnManager.Instance.OnTurnCleanup += HandleTurnCleanup;
+        subscribedToTurns = true;
+    }
+
+    private void HandleTurnCleanup(TurnContext ctx)
+    {
+        if (IsGameOver) return;
+
+        if (ObjectiveTracker.Instance != null
+            && ObjectiveTracker.Instance.IsSetupComplete
+            && ObjectiveTracker.Instance.TargetCount == 0)
+        {
+            TriggerVictory();
+        }
+    }
+
+    private void ApplyButtonLabels()
+    {
+        UITextData t = UITextProvider.Text;
+
+        if (retryButton != null)
+        {
+            TextMeshProUGUI label = retryButton.GetComponentInChildren<TextMeshProUGUI>(true);
+            if (label != null) label.text = t.btnRetry;
+        }
+
+        if (mainMenuButton != null)
+        {
+            TextMeshProUGUI label = mainMenuButton.GetComponentInChildren<TextMeshProUGUI>(true);
+            if (label != null) label.text = t.btnMainMenu;
+        }
+    }
+
     /// <summary>
-    /// ชัยชนะ: ขบวนร้อยอสูรทำลายศาลเจ้าศักดิ์สิทธิ์ทั้งหมดบนกระดานสำเร็จ!
+    /// ชัยชนะ: ขบวนร้อยอสูรทำลายศาลเจ้าศักดิ์สิทธิ์ทั้งหมดบนกระดานสำเร็จ
     /// </summary>
     public void TriggerVictory()
     {
@@ -87,35 +140,41 @@ public class GameOverController : SingletonBehaviour<GameOverController>
             victoryPanel.SetActive(true);
         }
 
-        int completedLoops = IncenseGaugeController.Instance != null ? IncenseGaugeController.Instance.CurrentLoop : 1;
+        UITextData t = UITextProvider.Text;
+        int round = GameStateManager.CurrentRound > 0
+            ? GameStateManager.CurrentRound
+            : (IncenseGaugeController.Instance != null ? IncenseGaugeController.Instance.CurrentLoop : 1);
+
         if (victoryTitleText != null)
         {
-            victoryTitleText.text = "ขบวนร้อยอสูรคว้าชัย!";
+            victoryTitleText.text = t.victoryTitle;
         }
 
         if (victoryDetailText != null)
         {
-            victoryDetailText.text = $"ศาลเจ้าศักดิ์สิทธิ์ถูกทำลายสิ้นซากในคืนที่ {completedLoops}\nความมืดมิดครอบงำผืนป่าชั่วนิรันดร์";
+            victoryDetailText.text = UITextData.Format(t.victoryDetail, "round", round);
         }
 
         AudioManager.Bell();
-        Debug.Log("<color=green>[GameOverController]</color> VICTORY! ผู้เล่นพาขบวนผีทำลายศาลเจ้าสำเร็จ");
+        Debug.Log("<color=green>[GameOverController]</color> VICTORY! All shrines destroyed.");
     }
 
     /// <summary>
-    /// พ่ายแพ้: ก้านธูปมอดดับหมด 7 ดอก (แสงตะวันสาดส่องชะล้างผี)
+    /// พ่ายแพ้: จบ Round สุดท้ายแล้วยังมีศาลเจ้าเหลือ
     /// </summary>
     public void TriggerDefeatByTimeOut()
     {
-        TriggerDefeat("แสงตะวันชะล้าง!", "ก้านธูปทั้ง 7 ดอกมอดดับลง แสงอาทิตย์ยามเช้าขับไล่ขบวนผีสลายไปจนหมดสิ้น");
+        UITextData t = UITextProvider.Text;
+        TriggerDefeat(t.defeatTimeTitle, t.defeatTimeReason);
     }
 
     /// <summary>
-    /// พ่ายแพ้: ผีบนกระดานตายหมด และไม่มีทรัพยากรสร้างกองทัพต่อ (Extinction)
+    /// พ่ายแพ้: ผีบนกระดานตายหมด ไร้รังผี และไม่มีการ์ดรังผีในมือ (Extinction)
     /// </summary>
     public void TriggerDefeatByExtinction()
     {
-        TriggerDefeat("ขบวนผีสูญพันธุ์!", "ภูตผีทั้งหมดในขบวนถูกป้อมอาคมทำลายจนหมดสิ้น ไร้ซึ่งพลังความมืดที่จะต่อกรกับศาลเจ้า");
+        UITextData t = UITextProvider.Text;
+        TriggerDefeat(t.defeatExtinctionTitle, t.defeatExtinctionReason);
     }
 
     public void TriggerDefeat(string title, string reason)

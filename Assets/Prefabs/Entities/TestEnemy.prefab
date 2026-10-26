@@ -13,6 +13,7 @@ GameObject:
   - component: {fileID: 2898295033207443421}
   - component: {fileID: 7811006818603888669}
   - component: {fileID: 5161316320713603031}
+  - component: {fileID: 1348201561487243125}
   m_Layer: 7
   m_Name: TestEnemy
   m_TagString: Untagged
@@ -55,8 +56,8 @@ BoxCollider:
   m_ProvidesContacts: 0
   m_Enabled: 1
   serializedVersion: 3
-  m_Size: {x: 1.2, y: 1.2, z: 1.2}
-  m_Center: {x: 0, y: 0.6, z: 0}
+  m_Size: {x: 0.6, y: 0.6, z: 0.6}
+  m_Center: {x: 0, y: 0.3, z: 0}
 --- !u!114 &2898295033207443421
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -73,6 +74,9 @@ MonoBehaviour:
   maxHealth: 25
   currentHealth: 0
   defense: 0
+  baseActionPoints: 2
+  baseMoveSpeed: 1
+  facingYawOffset: 0
   attackMultiplier: 1
   speedMultiplier: 1
   isFrenzied: 0
@@ -90,10 +94,9 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d9060e3ec4fa32944bf5203513807f67, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::EntityWalkable
-  moveInterval: 0.85
-  minMoveInterval: 0.15
-  leapDuration: 0.22
-  leapHeight: 0.35
+  hopDuration: 0.22
+  hopHeight: 0.35
+  holdPositionWhenInRange: 0
   loopCount: 0
   stepsTakenSinceLastLoop: 0
 --- !u!114 &5161316320713603031
@@ -108,10 +111,31 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: e183f65316601444086b0859c50f4ec4, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::EntityAttackable
-  attackDamage: 8
-  attackInterval: 1
-  attackRange: 3.5
-  targetRefreshInterval: 0.35
+  attackPattern: {fileID: 0}
+  baseDamage: 6
+  attacksPerTurn: 1
+  canTargetLanterns: 1
+  lungeDistance: 0.3
+  lungeDuration: 0.12
+--- !u!114 &1348201561487243125
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4579871054833848707}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 9138cf0ff3c6a6c4c97460eb95436908, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::EntityDroppable
+  offeringDropChanceOnDeath: 0.25
+  possibleOfferingDrops: []
+  cardDropChanceOnDeath: 0.3
+  possibleCardDrops: []
+  rewardOnLoopCompleted: 1
+  loopOfferingDropChance: 0.45
+  loopCardDropChance: 0.4
 --- !u!1 &4585153484291991736
 GameObject:
   m_ObjectHideFlags: 0

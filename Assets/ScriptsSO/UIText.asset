@@ -54,3 +54,13 @@ MonoBehaviour:
   altarEmpty: Empty
   altarFresh: Fresh ({rounds} left)
   altarRotten: Rotten
+  inventoryNextDiscardHint: 'Oldest slot: discarded next if backpack overflows.'
+  swapQuotaLabel: 'Swaps: {remaining} / {total}'
+  swapDeniedNotPlanning: Can only swap spirits during Planning
+  swapDeniedNoQuota: No formation swaps remaining this round
+  swapDeniedTooFar: Can only swap spirits within {max} path tiles
+  summaryTitle: Round {round} Complete
+  summaryShrinesLine: 'Shrine damage dealt: {damage}  |  Shrines remaining: {remaining} / {total}'
+  summarySpiritsLine: 'Spirits fallen: {died}  |  Mutated: {mutated}'
+  summaryLootLine: 'Loot gained: {items} offering(s), {cards} card(s)'
+  summaryAltarLine: 'Rotten this round: {rotten}  |  Incense left: {sticks}'

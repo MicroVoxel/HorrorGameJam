@@ -104,6 +104,12 @@ public class GameStateManager : SingletonBehaviour<GameStateManager>
     /// <summary>ปุ่ม Start Night เปิด/ปิดใช้งาน (true = กดได้)</summary>
     public event Action<bool> OnStartNightAvailabilityChanged;
 
+    /// <summary>
+    /// ยิงหลังผู้ฟัง OnStateChanged(RoundEnd) ทุกตัวทำงานจบแล้ว (ของถวายเน่า, แจก loot)
+    /// ระบบที่ต้องอ่านผลของ RoundEnd (เช่น RoundSummaryUI) ให้ฟังตัวนี้แทน เพื่อไม่ขึ้นกับลำดับ subscribe
+    /// </summary>
+    public event Action OnRoundEndProcessed;
+
     private void Start()
     {
         GameRandom.Initialize(Rules.BaseSeed);
@@ -145,6 +151,7 @@ public class GameStateManager : SingletonBehaviour<GameStateManager>
         if (state != GameState.Planning) return false;
 
         GameRandom.BeginRound(currentRound);
+        RoundSnapshot.Capture(currentRound, GameRandom.CurrentSeed);
         SetState(GameState.Resolution);
         return true;
     }
@@ -238,6 +245,13 @@ public class GameStateManager : SingletonBehaviour<GameStateManager>
 
         state = next;
         OnStateChanged?.Invoke(next);
+
+        // FIX บัก 6: ยิงเฉพาะเมื่อยังอยู่ใน RoundEnd (handler อาจสั่งจบเกมระหว่างทางแล้วเปลี่ยนเป็น Ended)
+        if (next == GameState.RoundEnd && state == GameState.RoundEnd)
+        {
+            OnRoundEndProcessed?.Invoke();
+        }
+
         RefreshStartNightAvailability();
     }
 }

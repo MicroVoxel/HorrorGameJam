@@ -62,6 +62,12 @@ PrefabInstance:
     - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: bed5852356956754aabd7741b7f422b1, type: 3}
       insertIndex: -1
       addedObject: {fileID: 3110386380802087836}
+    - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: bed5852356956754aabd7741b7f422b1, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 4327468179149947796}
+    - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: bed5852356956754aabd7741b7f422b1, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 4585365825736228616}
   m_SourcePrefab: {fileID: 100100000, guid: bed5852356956754aabd7741b7f422b1, type: 3}
 --- !u!1 &1485680248583786850 stripped
 GameObject:
@@ -86,6 +92,9 @@ MonoBehaviour:
   maxHealth: 50
   currentHealth: 0
   defense: 0
+  facing: 0
+  rotateModelWithFacing: 0
+  facingYawOffset: 0
   altarDefenseBonus: 0
   altarDamageReduction: 0
   altarArmorStripped: 0
@@ -101,8 +110,40 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 846ddc0804185434bb3bf5fb5fca6e8d, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::TowerAttackable
+  attackPattern: {fileID: 0}
   baseDamage: 10
-  attackInterval: 1.2
-  attackRange: 3.5
+  actionsPerTurn: 1
   damageMultiplier: 1
   fireRateMultiplier: 1
+  flashSeconds: 0.18
+--- !u!114 &4327468179149947796
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1485680248583786850}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 3947583dc63990e46a6ba690776ee760, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::TowerDroppable
+  cardDropChance: 0.75
+  possibleCards: []
+  offeringDropChance: 0.65
+  possibleOfferings: []
+  dropOfferingOnHealthThresholds: 1
+  healthThresholdStep: 0.25
+--- !u!114 &4585365825736228616
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1485680248583786850}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 32557dabd0acb014f94177ed7dfd9e9c, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::AbilityHolder
+  baseAbilities: []

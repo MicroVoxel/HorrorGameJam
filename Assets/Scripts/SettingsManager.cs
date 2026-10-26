@@ -17,6 +17,7 @@ public class SettingsManager : SingletonBehaviour<SettingsManager>
     private const string KEY_FULLSCREEN = "Setting_Fullscreen";
     private const string KEY_RES_WIDTH = "Setting_ResWidth";
     private const string KEY_RES_HEIGHT = "Setting_ResHeight";
+    private const string KEY_TURN_SPEED_IDX = "Setting_TurnSpeedIndex";
 
     public float MasterVolume { get; private set; } = 0.8f;
     public float BGMVolume { get; private set; } = 0.7f;
@@ -25,6 +26,7 @@ public class SettingsManager : SingletonBehaviour<SettingsManager>
     public bool IsFullscreen { get; private set; } = true;
     public int ResolutionWidth { get; private set; } = 1920;
     public int ResolutionHeight { get; private set; } = 1080;
+    public int TurnSpeedIndex { get; private set; } = 0;
 
     /// <summary>ส่งสัญญาณเมื่อค่าตั้งค่าใดๆ เปลี่ยน (เสียงหรือกราฟิก)</summary>
     public event Action OnSettingsChanged;
@@ -44,9 +46,17 @@ public class SettingsManager : SingletonBehaviour<SettingsManager>
 
         ResolutionWidth = PlayerPrefs.GetInt(KEY_RES_WIDTH, Screen.currentResolution.width);
         ResolutionHeight = PlayerPrefs.GetInt(KEY_RES_HEIGHT, Screen.currentResolution.height);
+        TurnSpeedIndex = PlayerPrefs.GetInt(KEY_TURN_SPEED_IDX, 0);
 
         ApplyGraphicsSettings();
         OnSettingsChanged?.Invoke();
+    }
+
+    public void SetTurnSpeedIndex(int speedIndex)
+    {
+        TurnSpeedIndex = Mathf.Max(0, speedIndex);
+        PlayerPrefs.SetInt(KEY_TURN_SPEED_IDX, TurnSpeedIndex);
+        PlayerPrefs.Save();
     }
 
     public void SetAudioSettings(float master, float bgm, float sfx)

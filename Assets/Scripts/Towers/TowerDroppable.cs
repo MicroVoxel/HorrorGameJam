@@ -2,8 +2,9 @@
 using UnityEngine;
 
 /// <summary>
-/// คอมโพเนนต์สำหรับติดบนป้อมโคมไฟหินหรือศาลเจ้า (TowerBase) 
-/// เมื่อป้อมถูกทำลาย หรือเมื่อเลือดศาลเจ้าลดลงทุกๆ ช่วงที่กำหนด (Chip Damage Loot) จะดรอปของถวายและการ์ดให้ผู้เล่น
+/// คอมโพเนนต์สำหรับติดบนป้อมโคมไฟหินหรือศาลเจ้า (TowerBase)
+/// เมื่อป้อมถูกทำลาย หรือเมื่อเลือดศาลเจ้าลดลงทุกๆ ช่วงที่กำหนด (Chip Damage Loot)
+/// v2 (4C): ใช้ GameRandom (Seeded RNG) และส่งของดรอปเข้า LootStash เพื่อแจกตอน RoundEnd
 /// </summary>
 [DisallowMultipleComponent]
 [RequireComponent(typeof(TowerBase))]
@@ -29,6 +30,11 @@ public class TowerDroppable : MonoBehaviour
     {
         towerBase = GetComponent<TowerBase>();
         nextThresholdNormalized = 1.0f - Mathf.Clamp(healthThresholdStep, 0.1f, 0.5f);
+    }
+
+    private void Start()
+    {
+        LootStash.RegisterPools(possibleOfferings, possibleCards);
     }
 
     private void OnEnable()
@@ -63,18 +69,21 @@ public class TowerDroppable : MonoBehaviour
 
     private void HandleTowerDestroyed(TowerBase destroyedTower)
     {
-        if (Random.value <= offeringDropChance)
+        if (offeringDropChance > 0f && GameRandom.Chance(offeringDropChance))
         {
             GrantRandomOffering("Tower Destroyed");
         }
 
-        if (Random.value <= cardDropChance && possibleCards.Count > 0)
+        if (cardDropChance > 0f && possibleCards != null && possibleCards.Count > 0)
         {
-            CardData card = possibleCards[Random.Range(0, possibleCards.Count)];
-            CardDeckController deck = FindAnyObjectByType<CardDeckController>();
-            if (card != null && deck != null)
+            float effectiveCardChance = Mathf.Clamp01(cardDropChance + LootStash.GetThreatCardChanceBonus());
+            if (GameRandom.Chance(effectiveCardChance))
             {
-                deck.AddCardToHand(card);
+                CardData card = GameRandom.Pick(possibleCards);
+                if (card != null)
+                {
+                    LootStash.StashCard(card, "Tower Destroyed");
+                }
             }
         }
     }
@@ -83,11 +92,10 @@ public class TowerDroppable : MonoBehaviour
     {
         if (possibleOfferings == null || possibleOfferings.Count == 0) return;
 
-        OfferingItemData item = possibleOfferings[Random.Range(0, possibleOfferings.Count)];
-        if (item != null && InventorySlotManager.Instance != null)
+        OfferingItemData item = GameRandom.Pick(possibleOfferings);
+        if (item != null)
         {
-            InventorySlotManager.Instance.AddItem(item);
-            Debug.Log($"<color=yellow>[{reason}]</color> ของเซ่นไหว้ '{item.ItemName}' ร่วงหล่นลงกระเป๋า!");
+            LootStash.StashOffering(item, reason);
         }
     }
 }

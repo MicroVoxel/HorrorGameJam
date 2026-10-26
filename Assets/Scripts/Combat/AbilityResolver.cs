@@ -3,7 +3,8 @@ using UnityEngine;
 
 /// <summary>
 /// ประมวลผล Keyword ที่ต้องทำในขั้น Cleanup: Last Breath
-/// ผี/ป้อมที่ตายส่งคำขอเข้าคิว (AbilityHolder) แล้วที่นี่ระเบิดตอน TurnManager.OnTurnCleanup
+/// ผี/ป้อมที่ตายส่งคำขอเข้าคิว (AbilityHolder) แล้ว TurnManager เรียก ResolvePending ก่อนยิง OnTurnCleanup
+/// เพื่อให้ Last Breath ระเบิดเสร็จก่อนที่ Victory / Extinction จะตัดสิน
 /// ตัวที่ตายจาก Last Breath ก็เข้าคิวต่อเป็นลูกโซ่ (จำกัดไม่เกิน 64 ครั้งต่อ Cleanup)
 /// ต้องมี 1 ตัวในซีนเกม (วางบน GameObject เดียวกับ TurnManager ได้)
 /// </summary>
@@ -23,7 +24,6 @@ public class AbilityResolver : SingletonBehaviour<AbilityResolver>
 
     private readonly Queue<LastBreathRequest> pending = new Queue<LastBreathRequest>();
     private readonly List<HexCoordinates> tiles = new List<HexCoordinates>(32);
-    private bool subscribedTurns;
     private bool subscribedState;
 
     // ---------- Static helpers ----------
@@ -57,6 +57,13 @@ public class AbilityResolver : SingletonBehaviour<AbilityResolver>
         });
     }
 
+    // FIX บัก 4: TurnManager เรียกก่อนยิง OnTurnCleanup เพื่อให้ Last Breath จบก่อนตัดสินแพ้/ชนะ
+    /// <summary>ประมวลผลคิว Last Breath ที่ค้างอยู่ทั้งหมด (รวมลูกโซ่) ปลอดภัยแม้ไม่มี AbilityResolver ในซีน</summary>
+    public static void ResolvePending(TurnContext ctx)
+    {
+        if (Instance != null) Instance.ProcessPending(ctx);
+    }
+
     // ---------- Lifecycle ----------
 
     private void Start()
@@ -66,12 +73,6 @@ public class AbilityResolver : SingletonBehaviour<AbilityResolver>
 
     private void TrySubscribe()
     {
-        if (!subscribedTurns && TurnManager.Instance != null)
-        {
-            TurnManager.Instance.OnTurnCleanup += HandleCleanup;
-            subscribedTurns = true;
-        }
-
         if (!subscribedState && GameStateManager.Instance != null)
         {
             GameStateManager.Instance.OnStateChanged += HandleStateChanged;
@@ -81,7 +82,6 @@ public class AbilityResolver : SingletonBehaviour<AbilityResolver>
 
     protected override void OnDestroy()
     {
-        if (subscribedTurns && TurnManager.Instance != null) TurnManager.Instance.OnTurnCleanup -= HandleCleanup;
         if (subscribedState && GameStateManager.Instance != null) GameStateManager.Instance.OnStateChanged -= HandleStateChanged;
 
         base.OnDestroy();
@@ -93,9 +93,9 @@ public class AbilityResolver : SingletonBehaviour<AbilityResolver>
         if (state != GameState.Resolution) pending.Clear();
     }
 
-    // ---------- Cleanup ----------
+    // ---------- Resolve ----------
 
-    private void HandleCleanup(TurnContext ctx)
+    private void ProcessPending(TurnContext ctx)
     {
         int guard = 0;
         while (pending.Count > 0 && guard < MaxChainPerCleanup)

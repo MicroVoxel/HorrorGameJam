@@ -141,7 +141,7 @@ public class TilePlacementManager : SingletonBehaviour<TilePlacementManager>
             previewDirty = false;
         }
 
-        if (GameInput.LeftPressed && !overUI && !IsDetailPopupBlocking())
+        if (GameInput.LeftPressed && !overUI)
         {
             TryPlaceOn(tile);
         }
@@ -319,13 +319,6 @@ public class TilePlacementManager : SingletonBehaviour<TilePlacementManager>
     private static bool IsPointerOverUI()
     {
         return EventSystem.current != null && EventSystem.current.IsPointerOverGameObject();
-    }
-
-    // ลบเมธอดนี้พร้อม CardDetailPopup ใน Part 5 (Hover Tooltip แทน Popup)
-    private static bool IsDetailPopupBlocking()
-    {
-        CardDetailPopup popup = CardDetailPopup.Instance;
-        return popup != null && (popup.IsOpen || popup.WasClosedThisFrame);
     }
 
     private HexTile RaycastHexTileUnderMouse()

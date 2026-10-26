@@ -3,48 +3,124 @@ using System.Collections.Generic;
 using UnityEngine;
 
 /// <summary>
-/// ตรวจจับสภาวะ "ขบวนผีสูญพันธุ์" (Extinction Defeat):
-/// หลังเข้าสู่ช่วงเล่นจริง (GameState = Playing) และพ้น Grace Period แล้ว หาก:
-/// 1. ไม่มีผีที่มีชีวิตอยู่บนถนนเลย (EntityRegistry.ActiveCount == 0)
+/// ตรวจจับสภาวะ "ขบวนผีสูญพันธุ์" (Extinction Defeat) ตาม GDD 2.3 และ 4.2:
+/// เช็กหลังทุกขั้น Cleanup ของเทิร์น (TurnManager.OnTurnCleanup) และหลัง RoundEnd ประมวลผลจบ:
+/// 1. ไม่มีผีที่มีชีวิตอยู่บนทางเดินเลย (EntityRegistry.ActiveCount == 0)
 /// 2. ไม่มีรังผี (TowerSpawnable) ตั้งอยู่บนกระดานที่จะผลิตผีออกมาได้อีก
-/// 3. ไม่มีการ์ดบนมือที่สามารถนำมาวางผลิตผีได้
-/// ระบบจะสั่งแจ้งเตือน Game Over ทันที
+/// 3. ไม่มีการ์ดรังผีในมือ (และไม่มีการ์ดรังผีรอแจกอยู่ใน LootStash)
+/// หากศาลเจ้าทั้งหมดพังใน Cleanup เดียวกัน จะให้สิทธิ์ Victory ก่อนเสมอ
+///
+/// FIX บัก 9: ถ้า Planning ถัดไปจะจั่วการ์ดให้ (CardsDrawnPerRound) และกองจั่วมีการ์ดรังผีอยู่
+/// จะยังไม่ตัดสินแพ้ทันที แต่รอให้จั่วเสร็จตอนเริ่ม Round ใหม่ แล้วค่อยตัดสินอีกครั้ง
 /// </summary>
 [DisallowMultipleComponent]
 public class ParadeExtinctionChecker : MonoBehaviour
 {
-    [Header("Extinction Check Timings")]
-    [Tooltip("ระยะเวลาหน่วงก่อนเริ่มตรวจจับการสูญพันธุ์ (ป้องกันเช็กช่วงรอยต่อตอนเริ่มปล่อยตัว)")]
-    [SerializeField] private float initialGracePeriod = 6.0f;
-    [SerializeField] private float checkInterval = 1.5f;
+    private bool subscribedToTurns;
+    private bool subscribedToState;
+    private bool deferredToNextRound; // FIX บัก 9: เจอสภาพสูญพันธุ์แล้ว แต่รอผลการจั่วของ Round ถัดไป
 
-    private IEnumerator Start()
+    private void OnEnable()
     {
-        // 1. รอจนเข้าช่วงเล่นจริง (วางศาลเจ้าครบ)
-        yield return new WaitUntil(() => GameStateManager.IsPlaying);
+        TrySubscribe();
+    }
 
-        // 2. รอให้รังผีชุดแรกทำงานก่อน
-        yield return new WaitForSeconds(initialGracePeriod);
+    private void Start()
+    {
+        TrySubscribe();
+    }
 
-        // 3. วนเช็กจนกว่าเกมจะจบ
-        WaitForSeconds interval = new WaitForSeconds(checkInterval);
-        while (GameStateManager.IsPlaying)
+    private void OnDisable()
+    {
+        if (subscribedToTurns && TurnManager.Instance != null)
         {
-            EvaluateExtinctionCondition();
-            yield return interval;
+            TurnManager.Instance.OnTurnCleanup -= HandleTurnCleanup;
+        }
+
+        if (subscribedToState && GameStateManager.Instance != null)
+        {
+            GameStateManager.Instance.OnStateChanged -= HandleGameStateChanged;
+            GameStateManager.Instance.OnRoundEndProcessed -= HandleRoundEndProcessed;
+            GameStateManager.Instance.OnRoundStarted -= HandleRoundStarted;
+        }
+
+        subscribedToTurns = false;
+        subscribedToState = false;
+    }
+
+    private void TrySubscribe()
+    {
+        if (!subscribedToTurns && TurnManager.Instance != null)
+        {
+            TurnManager.Instance.OnTurnCleanup += HandleTurnCleanup;
+            subscribedToTurns = true;
+        }
+
+        if (!subscribedToState && GameStateManager.Instance != null)
+        {
+            GameStateManager.Instance.OnStateChanged += HandleGameStateChanged;
+            GameStateManager.Instance.OnRoundEndProcessed += HandleRoundEndProcessed;
+            GameStateManager.Instance.OnRoundStarted += HandleRoundStarted;
+            subscribedToState = true;
         }
     }
 
-    private void EvaluateExtinctionCondition()
+    private void HandleTurnCleanup(TurnContext ctx)
     {
-        // 1. ยังมีผีเดินอยู่บนถนนหรือไม่
-        if (EntityRegistry.ActiveCount > 0)
+        EvaluateExtinctionCondition();
+    }
+
+    private void HandleGameStateChanged(GameState state)
+    {
+        // แค่ลองสมัครรับ event ที่ยังไม่ได้ต่อ (ตัวเช็ก RoundEnd ย้ายไป HandleRoundEndProcessed แล้ว)
+        TrySubscribe();
+    }
+
+    // FIX บัก 9: เช็กหลังของเน่าและ loot แจกเสร็จแล้ว (การ์ดรังที่เพิ่งดรอปอยู่ในมือแล้ว)
+    private void HandleRoundEndProcessed()
+    {
+        EvaluateExtinctionCondition();
+    }
+
+    // FIX บัก 9: ตัดสินที่ค้างไว้ หลังการจั่วของ Round ใหม่เสร็จ
+    private void HandleRoundStarted(int round, int turns)
+    {
+        if (!deferredToNextRound) return;
+        StartCoroutine(EvaluateAfterDraw());
+    }
+
+    private IEnumerator EvaluateAfterDraw()
+    {
+        // รอ 1 เฟรม ให้ CardDeckController จั่วการ์ดของ Round นี้เสร็จทุกกรณี ไม่ขึ้นกับลำดับ subscribe
+        yield return null;
+
+        deferredToNextRound = false;
+        EvaluateInternal(allowDefer: false);
+    }
+
+    public void EvaluateExtinctionCondition()
+    {
+        EvaluateInternal(allowDefer: true);
+    }
+
+    private void EvaluateInternal(bool allowDefer)
+    {
+        if (GameStateManager.IsDawn || GameStateManager.IsEnded) return;
+
+        // หากศาลเจ้าถูกทำลายครบหมดแล้ว ให้ตัดสินเป็น Victory ก่อนเสมอ (เช่น ผีตัวสุดท้ายระเบิด Last Breath พังศาลหลังสุดท้าย)
+        if (ObjectiveTracker.Instance != null && ObjectiveTracker.Instance.IsSetupComplete)
         {
-            return;
+            if (ObjectiveTracker.Instance.TargetCount == 0)
+            {
+                ObjectiveTracker.Instance.EvaluateVictoryAfterCleanup();
+                return;
+            }
         }
 
+        // 1. ยังมีผีเดินอยู่บนถนนหรือไม่
+        if (EntityRegistry.ActiveCount > 0) return;
+
         // 2. ยังมีรังผี (TowerSpawnable) ที่วางอยู่บนกระดานและยังไม่พังหรือไม่
-        //    ใช้ TowerBase.ActiveTowers (เฉพาะที่วางจริงแล้ว) แทนการ FindObjectsByType ทั้งฉาก
         IReadOnlyList<TowerBase> towers = TowerBase.ActiveTowers;
         for (int i = 0; i < towers.Count; i++)
         {
@@ -55,34 +131,63 @@ public class ParadeExtinctionChecker : MonoBehaviour
             }
         }
 
-        // 3. ในมือยังมีการ์ดรังผีให้วางแก้เกมหรือไม่
-        if (HasSpawnerCardInHand())
+        // 3. ในมือ (หรือใน LootStash ที่กำลังจะแจกตอนจบ Round) ยังมีการ์ดรังผีให้วางแก้เกมหรือไม่
+        if (HasSpawnerCardAvailable()) return;
+
+        // FIX บัก 9: Planning ถัดไปอาจจั่วได้การ์ดรังผี ให้รอผลการจั่วก่อนตัดสิน
+        if (allowDefer && CouldDrawSpawnerNextRound())
         {
+            deferredToNextRound = true;
             return;
         }
 
-        Debug.LogWarning("<color=red>[ParadeExtinctionChecker]</color> ผีตายหมดกระดาน ไร้รังผี และไม่มีการ์ดให้วางต่อ — ขบวนผีสูญพันธุ์!");
+        Debug.LogWarning("<color=red>[ParadeExtinctionChecker]</color> All spirits have fallen, no spawner remains on board or in hand — Parade Extinct!");
         if (GameOverController.Instance != null)
         {
             GameOverController.Instance.TriggerDefeatByExtinction();
         }
     }
 
-    private bool HasSpawnerCardInHand()
+    /// <summary>Round ถัดไปยังมี และจะจั่วการ์ด และกองจั่วมีการ์ดรังผีอยู่ (ถ้าไม่มี การรอก็ไม่ช่วยอะไร)</summary>
+    private static bool CouldDrawSpawnerNextRound()
+    {
+        GameStateManager gsm = GameStateManager.Instance;
+        if (gsm == null || CardDeckController.Instance == null) return false;
+        if (GameStateManager.CurrentRound >= gsm.Rules.TotalRounds) return false;
+        if (gsm.Rules.CardsDrawnPerRound <= 0) return false;
+
+        return CardDeckController.Instance.CanDrawSpawnerCard();
+    }
+
+    private static bool HasSpawnerCardAvailable()
     {
         CardDeckController deck = CardDeckController.Instance;
-        if (deck == null || deck.CardCount == 0) return false;
-
-        IReadOnlyList<CardUI> cards = deck.CardsInHand;
-        for (int i = 0; i < cards.Count; i++)
+        if (deck != null && deck.CardCount > 0)
         {
-            CardData data = cards[i] != null ? cards[i].CardData : null;
-            if (data != null && data.TowerPrefab != null && data.TowerPrefab.GetComponent<TowerSpawnable>() != null)
+            IReadOnlyList<CardUI> cards = deck.CardsInHand;
+            for (int i = 0; i < cards.Count; i++)
             {
-                return true;
+                CardData data = cards[i] != null ? cards[i].CardData : null;
+                if (IsSpawnerCard(data)) return true;
+            }
+        }
+
+        if (LootStash.Instance != null)
+        {
+            IReadOnlyList<CardData> pendingCards = LootStash.Instance.PendingCards;
+            for (int i = 0; i < pendingCards.Count; i++)
+            {
+                if (IsSpawnerCard(pendingCards[i])) return true;
             }
         }
 
         return false;
+    }
+
+    private static bool IsSpawnerCard(CardData data)
+    {
+        return data != null
+               && data.TowerPrefab != null
+               && data.TowerPrefab.GetComponent<TowerSpawnable>() != null;
     }
 }

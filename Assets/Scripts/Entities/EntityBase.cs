@@ -259,6 +259,9 @@ public class EntityBase : MonoBehaviour, IDamageable
             occupiedTile = null;
         }
 
+        // FIX บัก 5: ถอดจาก Registry ทันที (Destroy มีผลท้ายเฟรม แต่ Skip รันทั้ง Round ในเฟรมเดียว)
+        EntityRegistry.Unregister(this);
+
         OnEntityDied?.Invoke(this);
 
         if (deathVfxPrefab != null)
