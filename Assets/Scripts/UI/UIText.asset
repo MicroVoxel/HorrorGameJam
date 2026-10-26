@@ -1,0 +1,56 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d2358fa48b98d36469a9c308b31cd55b, type: 3}
+  m_Name: UIText
+  m_EditorClassIdentifier: Assembly-CSharp::UITextData
+  phaseDawn: Dawn - Place Your Shrines
+  phasePlanning: Moonless - Planning
+  phaseResolution: Moonlit - Ritual in Progress
+  phaseRoundEnd: Moonlit - Round Complete
+  phaseEnded: The Night Is Over
+  roundLabel: Round {current} / {total}
+  turnLabel: Turn {current} / {total}
+  nextRitualInfo: 'Next ritual: {turns} turns'
+  incenseLabel: Incense {current} / {total}
+  btnStartNight: Start Night
+  btnBeginRitual: Begin Ritual
+  btnContinue: Continue
+  btnSkip: Skip
+  btnRetry: Retry
+  btnMainMenu: Main Menu
+  speedLabel: '{speed}x'
+  startNightDisabledHint: Place all shrines to start ({placed} / {required})
+  tooltipEmptyTip: Hover over anything to see details. Hold Shift for more.
+  tooltipDetailHint: Hold Shift for details
+  placeRotateHint: 'Q / E: Rotate'
+  cannotPlaceNotAdjacent: Must be placed next to the path
+  cannotPlaceAdjacentShrine: Cannot be placed next to another shrine
+  cannotPlaceOccupied: This tile is occupied
+  cannotPlaceGroundType: Cannot be placed on this terrain
+  cannotPlaceWrongPhase: Cannot be placed during the ritual
+  cannotPlaceNoThreatPath: Needs at least {count} path tiles in range
+  objectiveSetup: 'Shrines placed: {placed} / {required}'
+  objectiveRemaining: 'Shrines remaining: {current} / {total}'
+  victoryTitle: The Parade Triumphs
+  victoryDetail: Every shrine was destroyed on night {round}.
+  defeatTimeTitle: Sunlight Prevails
+  defeatTimeReason: All the incense burned out before the shrines fell.
+  defeatExtinctionTitle: The Parade Is Extinct
+  defeatExtinctionReason: Every spirit has fallen and no spawner remains.
+  altarDrink: Drink
+  altarSavory: Savory
+  altarSweet: Sweet
+  altarFragrance: Fragrance
+  altarUtility: Utility
+  altarEmpty: Empty
+  altarFresh: Fresh ({rounds} left)
+  altarRotten: Rotten

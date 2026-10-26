@@ -1,0 +1,20 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: b1e5f952eeb7a9b4baebb6d69b894dc9, type: 3}
+  m_Name: Card Lantern
+  m_EditorClassIdentifier: Assembly-CSharp::CardData
+  cardId: StoneLanturn
+  cardName: Stone Lanturn
+  description: Shine a light to the path
+  icon: {fileID: 8673857883314834134, guid: 84356da12a8249c499e709f4475f15d8, type: 3}
+  frameThemeColor: {r: 1, g: 1, b: 1, a: 1}
+  towerPrefab: {fileID: 3263257694728267450, guid: 7e75acfc2d07d484aa52aed200a5751f, type: 3}
