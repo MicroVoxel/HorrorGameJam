@@ -16,16 +16,11 @@ public enum GameState
     Planning,
     Resolution,
     RoundEnd,
-    Ended,
-
-    // ชื่อเดิมจากเวอร์ชัน Real-time เก็บไว้ชั่วคราวให้โค้ดเก่าคอมไพล์ผ่าน (จะขึ้น Warning) ลบทิ้งเมื่อย้ายครบ
-    [Obsolete("Use GameState.Dawn")] Setup = Dawn,
-    [Obsolete("Use GameState.Planning or GameState.Resolution")] Playing = Planning
+    Ended
 }
 
 /// <summary>
 /// ตัวถือสถานะเกมและลำดับ Round เพียงตัวเดียว ต้องมี 1 ตัวในซีนเกมเพลย์
-/// ไม่ได้ขับเทิร์นเอง (เป็นหน้าที่ของ TurnManager ใน Part 2) แต่เป็นผู้อนุญาตว่าตอนนี้อยู่เฟสไหน
 /// ระบบอื่นอ่านสถานะผ่าน static property เช่น GameStateManager.IsPlanning
 /// </summary>
 [DisallowMultipleComponent]
@@ -57,12 +52,6 @@ public class GameStateManager : SingletonBehaviour<GameStateManager>
 
     /// <summary>ช่วงที่ผู้เล่นวางการ์ด ถวายของ และจัดขบวนได้ (Dawn และ Planning)</summary>
     public static bool IsPlayerActionPhase => IsDawn || IsPlanning;
-
-    [Obsolete("Use IsDawn")]
-    public static bool IsSetup => IsDawn;
-
-    [Obsolete("Use IsPlanning or IsResolution")]
-    public static bool IsPlaying => IsPlanning || IsResolution;
 
     // ---------- Round info ----------
     public static int CurrentRound => Instance != null ? Instance.currentRound : 0;
@@ -116,7 +105,6 @@ public class GameStateManager : SingletonBehaviour<GameStateManager>
 
         if (ObjectiveTracker.Instance != null)
         {
-            ObjectiveTracker.Instance.SetRequiredShrinesCount(Rules.RequiredShrines);
             ObjectiveTracker.Instance.OnSetupProgressChanged += HandleSetupProgressChanged;
         }
 
@@ -246,7 +234,6 @@ public class GameStateManager : SingletonBehaviour<GameStateManager>
         state = next;
         OnStateChanged?.Invoke(next);
 
-        // FIX บัก 6: ยิงเฉพาะเมื่อยังอยู่ใน RoundEnd (handler อาจสั่งจบเกมระหว่างทางแล้วเปลี่ยนเป็น Ended)
         if (next == GameState.RoundEnd && state == GameState.RoundEnd)
         {
             OnRoundEndProcessed?.Invoke();

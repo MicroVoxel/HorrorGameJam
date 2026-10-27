@@ -4,7 +4,7 @@ using UnityEngine;
 
 /// <summary>
 /// บันทึกสถานะก่อนเริ่ม Resolution ของแต่ละ Round (GDD 3 & 7.2)
-/// เก็บตำแหน่งผี, ของถวายบนโต๊ะบูชา, การ์ดในมือ และ Seed ของ Round เพื่อรองรับระบบ Replay / Undo
+/// ใช้ OfferingInstance เดียวกันทั้งสำหรับช่องโต๊ะบูชาและของในกระเป๋า
 /// </summary>
 [Serializable]
 public class RoundSnapshot
@@ -24,15 +24,14 @@ public class RoundSnapshot
     public struct AltarRecord
     {
         public OfferingType category;
-        public OfferingItemData item;
-        public int remainingRounds;
-        public bool isRotten;
+        public OfferingInstance offering;
     }
 
     public int roundNumber;
     public int roundSeed;
     public List<EntityRecord> entities = new List<EntityRecord>();
     public List<AltarRecord> altarSlots = new List<AltarRecord>();
+    public List<OfferingInstance> backpackOfferings = new List<OfferingInstance>();
     public List<CardData> handCards = new List<CardData>();
 
     public static RoundSnapshot CaptureCurrent { get; private set; }
@@ -74,10 +73,17 @@ public class RoundSnapshot
                 snap.altarSlots.Add(new AltarRecord
                 {
                     category = s.slotCategory,
-                    item = s.currentItem,
-                    remainingRounds = s.remainingDecayLoops,
-                    isRotten = s.isRotten
+                    offering = s.offering
                 });
+            }
+        }
+
+        if (InventorySlotManager.Instance != null)
+        {
+            IReadOnlyList<OfferingInstance> bag = InventorySlotManager.Instance.Entries;
+            for (int i = 0; i < bag.Count; i++)
+            {
+                snap.backpackOfferings.Add(bag[i]);
             }
         }
 

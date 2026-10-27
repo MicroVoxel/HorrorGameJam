@@ -4,10 +4,9 @@ using TMPro;
 
 /// <summary>
 /// ควบคุมพฤติกรรมแผงขวา, แถบการ์ดด้านล่าง และปุ่มหลักตามเฟส (GDD 6.2 & 6.3):
-/// - Dawn: แสดงแผงขวาครบ 3 ช่อง + แถบการ์ด + ปุ่ม Start Night (ปิดจนกว่าจะวางศาลครบ)
-/// - Planning: แสดงแผงขวาครบ 3 ช่อง + แถบการ์ด + ปุ่ม Begin Ritual
-/// - Resolution: เลื่อนช่อง Altar (1) และ Inventory (2) ออกขวา เหลือเฉพาะ Tooltip, เลื่อนแถบการ์ดลง, โชว์ Speed Control
-/// - RoundEnd: เลื่อนแผงกลับมา และแสดงปุ่ม Continue
+/// - ตัวเลือก 2A: ในเฟส Planning ไม่แสดง "Next ritual: N turns" ซ้ำที่นี่ (แสดงที่ TurnTrackerUI จุดเดียว)
+///   ส่วน statusHintText ใช้แสดงเฉพาะคำแนะนำตอนปุ่ม Start Night ถูกล็อก หรือข้อความเตือนชั่วคราวตอนวาง/สลับไม่ได้
+/// - ตัวเลือก 4A: คำแนะนำช่วง Dawn ไม่แสดงตัวเลข 1 / 2 ซ้ำกับ ObjectiveTracker
 /// </summary>
 [DisallowMultipleComponent]
 public class SidePanelController : SingletonBehaviour<SidePanelController>
@@ -151,6 +150,7 @@ public class SidePanelController : SingletonBehaviour<SidePanelController>
                 break;
 
             case GameState.RoundEnd:
+                if (RoundSummaryUI.Instance != null) RoundSummaryUI.Instance.HideSummary();
                 GameStateManager.Instance.FinishRoundEnd();
                 break;
         }
@@ -178,7 +178,14 @@ public class SidePanelController : SingletonBehaviour<SidePanelController>
 
         if (primaryActionButton != null)
         {
-            bool showButton = state == GameState.Dawn || state == GameState.Planning || state == GameState.RoundEnd;
+            bool summaryHandlesContinue = state == GameState.RoundEnd
+                                          && RoundSummaryUI.Instance != null
+                                          && RoundSummaryUI.Instance.HasContinueButton;
+
+            bool showButton = state == GameState.Dawn
+                              || state == GameState.Planning
+                              || (state == GameState.RoundEnd && !summaryHandlesContinue);
+
             primaryActionButton.gameObject.SetActive(showButton);
 
             if (state == GameState.Dawn)
@@ -200,17 +207,10 @@ public class SidePanelController : SingletonBehaviour<SidePanelController>
 
         if (statusHintText != null)
         {
-            if (state == GameState.Dawn && !GameStateManager.CanStartNight && ObjectiveTracker.Instance != null)
+            // ตัวเลือก 4A + 2A: แสดงเฉพาะตอนปุ่ม Start Night ถูกล็อก (ไม่โชว์ตัวเลข 1/2 ซ้ำ และไม่โชว์ Next ritual ซ้ำใน Planning)
+            if (state == GameState.Dawn && !GameStateManager.CanStartNight)
             {
-                statusHintText.text = UITextData.Format(
-                    t.startNightDisabledHint,
-                    "placed", ObjectiveTracker.Instance.TotalShrinesPlaced,
-                    "required", ObjectiveTracker.Instance.RequiredShrinesToPlace);
-            }
-            else if (state == GameState.Planning)
-            {
-                int turns = GameStateManager.TurnsThisRound;
-                statusHintText.text = UITextData.Format(t.nextRitualInfo, "turns", turns);
+                statusHintText.text = t.startNightDisabledHint;
             }
             else
             {

@@ -4,52 +4,33 @@ using UnityEngine;
 
 public enum HexPatternType
 {
-    Ring,       // ทุกช่องห่างไม่เกิน N (ไม่ขึ้นกับทิศ)
-    Line,       // N ช่องเป็นเส้นตรงไปด้านหน้า
-    Fan,        // ลิ่ม 120 องศาด้านหน้า กว้างขึ้นตามระยะ
-    Custom,     // รายการ offset ที่ทิศหน้า 0 หมุนตาม Facing
-    King,       // 6 ช่องรอบตัว (King+ = เพิ่ม 6 ช่องมุมห่าง 2 ช่อง)
-    Rook,       // 6 เส้นตรงตามขอบ ยาวเส้นละ N
-    Bishop,     // 6 เส้นตรงตามมุม ยาวเส้นละ N ก้าว
-    Queen,      // Rook + Bishop
-    Knight,     // 12 ช่องรูปตัว L ห่าง 3 ช่อง ข้ามหน่วยเสมอ
-    Pawn,       // 3 ช่องด้านหน้า (= Fan 1)
-    Compound    // รวมหลาย Pattern (Union)
+    Ring,
+    Line,
+    Fan,
+    Custom,
+    King,
+    Rook,
+    Bishop,
+    Queen,
+    Knight,
+    Pawn,
+    Compound
 }
 
 /// <summary>
 /// ตัวช่วยบอก Pattern ว่าช่องไหนอยู่บนกระดาน และช่องไหนมีหน่วยยืนขวาง
-/// ForBoard() สร้างจาก LoopPathManager ส่วน sizeDelta / ignoreBlocking ใช้รับผลของถวาย
+/// สร้างผ่าน BoardPatternContext.Get() หรือ BoardPatternContext.ForTower()
 /// </summary>
 public struct HexPatternContext
 {
-    /// <summary>null = ถือว่าทุกช่องอยู่บนกระดาน</summary>
     public Func<HexCoordinates, bool> isOnBoard;
-
-    /// <summary>ช่องนี้มีหน่วยยืนขวางหรือไม่ (ใช้เมื่อ Pattern เปิด blockedByUnits)</summary>
     public Func<HexCoordinates, bool> isBlocking;
-
-    /// <summary>บวกลบขนาด N ของทุก Pattern (เช่น -1 จาก Fragrance ที่เน่า) N ต่ำสุดคือ 1</summary>
     public int sizeDelta;
-
-    /// <summary>true = ข้ามการบล็อกของหน่วย (เช่น Fortune Candle ที่ยังสด)</summary>
     public bool ignoreBlocking;
-
-    public static HexPatternContext ForBoard(LoopPathManager board, int sizeDelta = 0, bool ignoreBlocking = false)
-    {
-        return new HexPatternContext
-        {
-            isOnBoard = c => board != null && board.TryGetTileAt(c, out _),
-            isBlocking = c => board != null && board.TryGetTileAt(c, out HexTile t) && (t.HasEntity || t.HasTower),
-            sizeDelta = sizeDelta,
-            ignoreBlocking = ignoreBlocking
-        };
-    }
 }
 
 /// <summary>
 /// ชุดช่อง Hex ที่ผูกกับทิศหน้า (Facing 0-5) ใช้เป็นได้ทั้ง Range Pattern และ Hit Pattern
-/// ลากใส่ Prefab ผ่าน AttackPatternData ผลคือรายการพิกัดสัมบูรณ์ (ช่องนอกกระดานถูกข้าม ช่องซ้ำนับครั้งเดียว)
 /// </summary>
 [CreateAssetMenu(fileName = "NewRangePattern", menuName = "GameJam/Hex Range Pattern")]
 public class HexRangePattern : ScriptableObject
@@ -85,9 +66,6 @@ public class HexRangePattern : ScriptableObject
     public bool IncludeCenter => includeCenter;
     public bool BlockedByUnits => blockedByUnits;
 
-    /// <summary>
-    /// รวบรวมช่องของ Pattern นี้เมื่อผู้ถือยืนที่ origin และหัน facing (ล้าง results ก่อน)
-    /// </summary>
     public void CollectTiles(HexCoordinates origin, int facing, List<HexCoordinates> results, in HexPatternContext ctx)
     {
         if (results == null) return;
@@ -219,10 +197,6 @@ public class HexRangePattern : ScriptableObject
         }
     }
 
-    /// <summary>
-    /// ลิ่ม 120 องศาด้านหน้า: ที่ระยะ d มี 2d+1 ช่อง เดินจากมุม (f-1) ไปมุม f แล้วไปมุม (f+1)
-    /// Fan 1 = 3 ช่อง (เท่า Pawn) Fan 2 = 8 ช่อง
-    /// </summary>
     private static void AddFan(HexCoordinates origin, int facing, int radius, List<HexCoordinates> results, in HexPatternContext ctx)
     {
         HexCoordinates cornerLeft = HexCoordinates.Directions[HexCoordinates.NormalizeFacing(facing - 1)];
@@ -245,7 +219,6 @@ public class HexRangePattern : ScriptableObject
 
     private static HexCoordinates[] BuildKnightOffsets()
     {
-        // เรียงสลับค่า (3, -2, -1) และ (-3, 2, 1) ใน cube coordinates ได้ 12 ช่อง (q = x, r = z)
         int[][] bases = { new[] { 3, -2, -1 }, new[] { -3, 2, 1 } };
         int[][] perms =
         {

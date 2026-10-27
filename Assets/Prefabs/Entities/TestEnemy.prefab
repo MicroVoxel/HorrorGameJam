@@ -111,7 +111,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: e183f65316601444086b0859c50f4ec4, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::EntityAttackable
-  attackPattern: {fileID: 0}
+  attackPattern: {fileID: 11400000, guid: a07281b54a46c5d4599dc2730366de12, type: 2}
   baseDamage: 6
   attacksPerTurn: 1
   canTargetLanterns: 1

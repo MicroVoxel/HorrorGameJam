@@ -592,10 +592,10 @@ RectTransform:
   m_Children: []
   m_Father: {fileID: 2021342862}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
-  m_AnchorMin: {x: 0, y: 0}
-  m_AnchorMax: {x: 0, y: 0}
-  m_AnchoredPosition: {x: 0, y: 0}
-  m_SizeDelta: {x: 50, y: 0}
+  m_AnchorMin: {x: 0, y: 1}
+  m_AnchorMax: {x: 0, y: 1}
+  m_AnchoredPosition: {x: 135.71428, y: -25}
+  m_SizeDelta: {x: 50, y: 50}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &134440322
 MonoBehaviour:
@@ -2222,10 +2222,10 @@ RectTransform:
   m_Children: []
   m_Father: {fileID: 2021342862}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
-  m_AnchorMin: {x: 0, y: 0}
-  m_AnchorMax: {x: 0, y: 0}
-  m_AnchoredPosition: {x: 0, y: 0}
-  m_SizeDelta: {x: 50, y: 0}
+  m_AnchorMin: {x: 0, y: 1}
+  m_AnchorMax: {x: 0, y: 1}
+  m_AnchoredPosition: {x: 352.85712, y: -25}
+  m_SizeDelta: {x: 50, y: 50}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &390817160
 MonoBehaviour:
@@ -2571,10 +2571,10 @@ RectTransform:
   m_Children: []
   m_Father: {fileID: 2021342862}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
-  m_AnchorMin: {x: 0, y: 0}
-  m_AnchorMax: {x: 0, y: 0}
-  m_AnchoredPosition: {x: 0, y: 0}
-  m_SizeDelta: {x: 50, y: 0}
+  m_AnchorMin: {x: 0, y: 1}
+  m_AnchorMax: {x: 0, y: 1}
+  m_AnchoredPosition: {x: 244.2857, y: -25}
+  m_SizeDelta: {x: 50, y: 50}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &429669252
 MonoBehaviour:
@@ -2714,7 +2714,6 @@ MonoBehaviour:
   moonlitLight:
     color: {r: 0.7, g: 0.8, b: 1, a: 1}
     intensity: 1.1
-  phaseStatusText: {fileID: 0}
 --- !u!114 &493159540
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -2729,7 +2728,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::LoopPathManager
   hexTilePrefab: {fileID: 8445746969646038329, guid: e182f3a0a1dbbc74db926e536575170a, type: 3}
   gridWidth: 13
-  gridHeight: 9
+  gridHeight: 13
   hexOuterRadius: 0.577
   tileRotationEuler: {x: 0, y: 30, z: 0}
   pathPreset: 0
@@ -2767,10 +2766,10 @@ RectTransform:
   m_Children: []
   m_Father: {fileID: 2021342862}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
-  m_AnchorMin: {x: 0, y: 0}
-  m_AnchorMax: {x: 0, y: 0}
-  m_AnchoredPosition: {x: 0, y: 0}
-  m_SizeDelta: {x: 50, y: 0}
+  m_AnchorMin: {x: 0, y: 1}
+  m_AnchorMax: {x: 0, y: 1}
+  m_AnchoredPosition: {x: 298.5714, y: -25}
+  m_SizeDelta: {x: 50, y: 50}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &509037978
 MonoBehaviour:
@@ -2822,14 +2821,13 @@ GameObject:
   - component: {fileID: 509912365}
   - component: {fileID: 509912364}
   - component: {fileID: 509912366}
-  - component: {fileID: 509912367}
   m_Layer: 5
-  m_Name: IncenseGroup(Script)
+  m_Name: IncenseGroup
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!224 &509912363
 RectTransform:
   m_ObjectHideFlags: 0
@@ -2916,31 +2914,6 @@ MonoBehaviour:
   m_ChildScaleWidth: 0
   m_ChildScaleHeight: 0
   m_ReverseArrangement: 0
---- !u!114 &509912367
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 509912362}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: ee97acd8c4128c44188c46f0c742db94, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::IncenseGaugeController
-  incenseFillBar: {fileID: 865575184}
-  loopCounterText: {fileID: 1573717303}
-  stickIcons:
-  - {fileID: 1420078257}
-  - {fileID: 748475031}
-  - {fileID: 134440322}
-  - {fileID: 1143496664}
-  - {fileID: 429669252}
-  - {fileID: 509037978}
-  - {fileID: 390817160}
-  activeStickColor: {r: 1, g: 1, b: 1, a: 1}
-  spentStickColor: {r: 0.25, g: 0.25, b: 0.25, a: 0.8}
-  burnSpeed: 0.6
 --- !u!1 &563706705
 GameObject:
   m_ObjectHideFlags: 0
@@ -3636,10 +3609,10 @@ RectTransform:
   m_Children: []
   m_Father: {fileID: 2021342862}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
-  m_AnchorMin: {x: 0, y: 0}
-  m_AnchorMax: {x: 0, y: 0}
-  m_AnchoredPosition: {x: 0, y: 0}
-  m_SizeDelta: {x: 50, y: 0}
+  m_AnchorMin: {x: 0, y: 1}
+  m_AnchorMax: {x: 0, y: 1}
+  m_AnchoredPosition: {x: 81.42857, y: -25}
+  m_SizeDelta: {x: 50, y: 50}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &748475031
 MonoBehaviour:
@@ -4166,10 +4139,10 @@ RectTransform:
   - {fileID: 865575183}
   m_Father: {fileID: 509912363}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
-  m_AnchorMin: {x: 0, y: 0}
-  m_AnchorMax: {x: 0, y: 0}
-  m_AnchoredPosition: {x: 0, y: 0}
-  m_SizeDelta: {x: 0, y: 35}
+  m_AnchorMin: {x: 0, y: 1}
+  m_AnchorMax: {x: 0, y: 1}
+  m_AnchoredPosition: {x: 190, y: -72.5}
+  m_SizeDelta: {x: 380, y: 35}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &886198608
 MonoBehaviour:
@@ -5360,7 +5333,6 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::LootStash
   bonusOfferingPool: []
   bonusCardPool: []
-  threatOfferingRollChance: 0.65
 --- !u!114 &1058493782
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -5373,8 +5345,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 6bb96963d0cf9334285d323ed8112d58, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::InventorySlotManager
-  maxSlots: 8
-  items: []
+  fallbackMaxSlots: 8
+  entries: []
   initialTestItems: []
 --- !u!114 &1058493783
 MonoBehaviour:
@@ -5392,13 +5364,9 @@ MonoBehaviour:
   retaliationLanternPrefab: {fileID: 3263257694728267450, guid: 7e75acfc2d07d484aa52aed200a5751f, type: 3}
   maxRetaliationLanterns: 4
   globalEntityAttackMultiplier: 1
-  globalEntitySpeedMultiplier: 1
   globalEntityMoveBonus: 0
-  isGlobalFrenzyActive: 0
   entityGrantLifedrain: 0
-  shrineDefenseBonus: 0
   shrineDamageReduction: 0
-  towerAttackIntervalMultiplier: 1
   shrineArmorStripped: 0
   shrinePoisonDamagePerTurn: 0
   towerGrantDoubleStrike: 0
@@ -5514,6 +5482,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 097a319ab585ccc498eee00b1472b01f, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::TurnTrackerUI
+  phaseStatusText: {fileID: 2142457380}
   roundText: {fileID: 959818362}
   turnOrNextRitualText: {fileID: 309094253}
   pipContainer: {fileID: 187671490}
@@ -5522,6 +5491,11 @@ MonoBehaviour:
   passedPipColor: {r: 0.85, g: 0.78, b: 0.55, a: 1}
   currentPipColor: {r: 1, g: 0.95, b: 0.35, a: 1}
   upcomingPipColor: {r: 0.35, g: 0.35, b: 0.42, a: 0.45}
+  incenseFillBar: {fileID: 865575184}
+  stickIcons: []
+  activeStickColor: {r: 1, g: 1, b: 1, a: 1}
+  spentStickColor: {r: 0.25, g: 0.25, b: 0.25, a: 0.8}
+  incenseBurnSpeed: 0.6
 --- !u!114 &1075254617
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -5977,10 +5951,10 @@ RectTransform:
   m_Children: []
   m_Father: {fileID: 2021342862}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
-  m_AnchorMin: {x: 0, y: 0}
-  m_AnchorMax: {x: 0, y: 0}
-  m_AnchoredPosition: {x: 0, y: 0}
-  m_SizeDelta: {x: 50, y: 0}
+  m_AnchorMin: {x: 0, y: 1}
+  m_AnchorMax: {x: 0, y: 1}
+  m_AnchoredPosition: {x: 190, y: -25}
+  m_SizeDelta: {x: 50, y: 50}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &1143496664
 MonoBehaviour:
@@ -6804,8 +6778,10 @@ MonoBehaviour:
   availableCards:
   - {fileID: 11400000, guid: 66c932c636909704b9b3c6154cdae1c7, type: 2}
   - {fileID: 11400000, guid: aba226f428a540e41a2859b2ab33c76b, type: 2}
+  - {fileID: 11400000, guid: c4fd0364b831ebf408c3fedf8d8d55b9, type: 2}
+  - {fileID: 11400000, guid: c4fd0364b831ebf408c3fedf8d8d55b9, type: 2}
   startingHandSize: 0
-  maxHandSize: 7
+  fallbackMaxHandSize: 7
   drawPerRoundOnRoundOne: 1
   handFullBehavior: 1
 --- !u!114 &1403990614
@@ -6857,10 +6833,10 @@ RectTransform:
   m_Children: []
   m_Father: {fileID: 2021342862}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
-  m_AnchorMin: {x: 0, y: 0}
-  m_AnchorMax: {x: 0, y: 0}
-  m_AnchoredPosition: {x: 0, y: 0}
-  m_SizeDelta: {x: 50, y: 0}
+  m_AnchorMin: {x: 0, y: 1}
+  m_AnchorMax: {x: 0, y: 1}
+  m_AnchoredPosition: {x: 27.142857, y: -25}
+  m_SizeDelta: {x: 50, y: 50}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &1420078257
 MonoBehaviour:
@@ -7206,10 +7182,10 @@ RectTransform:
   m_Children: []
   m_Father: {fileID: 509912363}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
-  m_AnchorMin: {x: 0, y: 0}
-  m_AnchorMax: {x: 0, y: 0}
-  m_AnchoredPosition: {x: 0, y: 0}
-  m_SizeDelta: {x: 0, y: 50}
+  m_AnchorMin: {x: 0, y: 1}
+  m_AnchorMax: {x: 0, y: 1}
+  m_AnchoredPosition: {x: 190, y: 0}
+  m_SizeDelta: {x: 380, y: 50}
   m_Pivot: {x: 0.5, y: 1}
 --- !u!114 &1573717303
 MonoBehaviour:
@@ -8713,10 +8689,10 @@ RectTransform:
   - {fileID: 390817159}
   m_Father: {fileID: 509912363}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
-  m_AnchorMin: {x: 0, y: 0}
-  m_AnchorMax: {x: 0, y: 0}
-  m_AnchoredPosition: {x: 0, y: 0}
-  m_SizeDelta: {x: 0, y: 50}
+  m_AnchorMin: {x: 0, y: 1}
+  m_AnchorMax: {x: 0, y: 1}
+  m_AnchoredPosition: {x: 190, y: -145}
+  m_SizeDelta: {x: 380, y: 50}
   m_Pivot: {x: 0.5, y: 0}
 --- !u!222 &2021342864
 CanvasRenderer:
@@ -9397,7 +9373,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: c6c32d1ab956eb34c83bcc73884b9619, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::ObjectiveTracker
-  requiredShrinesToPlace: 2
+  fallbackRequiredShrines: 2
   totalShrinesPlaced: 0
   objectiveCountText: {fileID: 1611650113}
 --- !u!114 &2102264768

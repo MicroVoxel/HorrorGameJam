@@ -4,12 +4,7 @@ using UnityEngine;
 
 /// <summary>
 /// ส่วนโจมตีของผี (ไม่ใช่ ITurnActor เอง EntityWalkable เป็นคนเรียกตอนมี AP)
-/// - เลือกเป้าหมายเฉพาะช่องใน Range Pattern: ศาลฝั่งป้อมที่ใกล้สุด เสมอกันให้ศาลเป้าหมายหลักก่อน แล้วค่อยสุ่มด้วย GameRandom
-/// - ทำดาเมจทุกช่องใน Hit Pattern เรียงจากใกล้ไปไกล ดาเมจ = floor(base x AttackMultiplier x falloff) แล้วหัก DEF ของเป้า
-/// - โจมตีได้ attacksPerTurn ครั้งต่อเทิร์น (Frenzy ปลดเพดานเป็นอย่างน้อย 2)
-///
-/// 4B Keyword: Double Strike (+1 ครั้งต่อเทิร์น), Armor Piercing (ข้าม DEF), Lifedrain (ฟื้น HP เท่าดาเมจ),
-///             Overrun (ดาเมจที่เกินส่งต่อเป้าถัดไปในช่อง Hit ถ้าไม่มีส่งเข้าศาลที่ใกล้สุดใน Range)
+/// ใช้ CombatResolver.ApplyHits ร่วมกับ TowerAttackable เพื่อให้ตรรกะดาเมจและ Overrun อยู่ที่เดียว
 /// </summary>
 [DisallowMultipleComponent]
 [RequireComponent(typeof(EntityBase))]
@@ -39,6 +34,7 @@ public class EntityAttackable : MonoBehaviour
 
     public AttackPatternData Pattern => attackPattern;
     public float BaseDamage => baseDamage;
+    public bool CanTargetLanterns => canTargetLanterns;
 
     /// <summary>จำนวนครั้งที่โจมตีได้ต่อเทิร์น (Double Strike +1, Frenzy ปลดเพดานเป็นอย่างน้อย 2 ไม่ซ้อนกัน)</summary>
     public int MaxAttacksPerTurn
@@ -92,7 +88,7 @@ public class EntityAttackable : MonoBehaviour
             if (!board.TryGetTileAt(rangeTiles[i], out HexTile tile)) continue;
 
             TowerBase tower = tile.CurrentTower;
-            if (!IsValidTarget(tower)) continue;
+            if (!CombatResolver.IsValidTowerTarget(tower, canTargetLanterns)) continue;
 
             int distance = origin.Coordinates.DistanceTo(rangeTiles[i]);
             bool isObjective = tower.GetComponent<TowerObjective>() != null;
@@ -127,9 +123,10 @@ public class EntityAttackable : MonoBehaviour
         if (target == null || target.IsDead || target.CurrentTile == null || originTile == null) yield break;
 
         HexPatternContext pctx = BoardPatternContext.Get();
+        HexCoordinates originCoord = originTile.Coordinates;
         HexCoordinates targetCoord = target.CurrentTile.Coordinates;
 
-        attackPattern.CollectHitTiles(originTile.Coordinates, entityBase.Facing, targetCoord, rangeTiles, hitTiles, pctx);
+        attackPattern.CollectHitTiles(originCoord, entityBase.Facing, targetCoord, rangeTiles, hitTiles, pctx);
 
         attacksUsed++;
         ctx.MarkAction();
@@ -147,123 +144,26 @@ public class EntityAttackable : MonoBehaviour
 
         if (animate) yield return MoveVisual(ctx, home, peak, lungeDuration);
 
-        ApplyHits(ctx, targetCoord);
+        CombatResolver.AttackerSpec spec = new CombatResolver.AttackerSpec
+        {
+            attackerName = entityBase.EntityName,
+            origin = originCoord,
+            pattern = attackPattern,
+            scaledBaseDamage = baseDamage * entityBase.AttackMultiplier,
+            fromSpirit = true,
+            canTargetLanterns = canTargetLanterns,
+            armorPiercing = Has(AbilityKeyword.ArmorPiercing),
+            overrun = Has(AbilityKeyword.Overrun),
+            lifedrain = Has(AbilityKeyword.Lifedrain),
+            selfEntity = entityBase
+        };
+
+        CombatResolver.ApplyHits(ctx, spec, targetCoord, rangeTiles, hitTiles);
 
         if (animate) yield return MoveVisual(ctx, peak, home, lungeDuration);
 
         transform.position = home;
         RangeIndicator.Hide(this);
-    }
-
-    private void ApplyHits(TurnContext ctx, HexCoordinates targetCoord)
-    {
-        LoopPathManager board = LoopPathManager.Instance;
-        if (board == null) return;
-
-        bool armorPiercing = Has(AbilityKeyword.ArmorPiercing);
-        bool overrun = Has(AbilityKeyword.Overrun);
-        float carry = 0f;
-
-        for (int i = 0; i < hitTiles.Count; i++)
-        {
-            if (!board.TryGetTileAt(hitTiles[i], out HexTile tile)) continue;
-
-            float falloff = attackPattern.GetDamageMultiplier(targetCoord, hitTiles[i]);
-            float raw = Mathf.Floor(baseDamage * entityBase.AttackMultiplier * falloff);
-
-            TowerBase tower = tile.CurrentTower;
-            if (IsValidTarget(tower))
-            {
-                DamageTower(ctx, tower, raw, armorPiercing, out float overkill);
-
-                if (overrun)
-                {
-                    float incoming = carry;
-                    carry = overkill;
-
-                    if (incoming > 0f)
-                    {
-                        if (!tower.IsDead)
-                        {
-                            // ดาเมจที่ส่งต่อมาเป็นค่าสุดท้ายแล้ว ไม่หัก DEF ซ้ำ
-                            DamageTower(ctx, tower, incoming, true, out float overkillFromCarry);
-                            carry = overkillFromCarry;
-                        }
-                        else
-                        {
-                            carry += incoming;
-                        }
-                    }
-                }
-            }
-
-            if (attackPattern.FriendlyFire)
-            {
-                EntityBase other = tile.CurrentEntity;
-                if (other != null && other != entityBase && !other.IsDead)
-                {
-                    float dealt = other.ApplyDamage(raw, false);
-                    ctx.Log($"{entityBase.EntityName} hits {other.EntityName} for {dealt:0}");
-                }
-            }
-        }
-
-        if (overrun && carry > 0f) ApplyOverrunToRange(ctx, board, carry);
-    }
-
-    /// <summary>Overrun: ไม่มีเป้าถัดไปในช่อง Hit ส่งดาเมจที่เหลือเข้าศาลที่ใกล้สุดใน Range (ที่ยังไม่ถูกตีรอบนี้)</summary>
-    private void ApplyOverrunToRange(TurnContext ctx, LoopPathManager board, float carry)
-    {
-        HexTile originTile = entityBase.OccupiedTile;
-        if (originTile == null) return;
-
-        TowerBase best = null;
-        int bestDistance = int.MaxValue;
-        bool bestIsObjective = false;
-
-        for (int i = 0; i < rangeTiles.Count; i++)
-        {
-            if (hitTiles.Contains(rangeTiles[i])) continue;
-            if (!board.TryGetTileAt(rangeTiles[i], out HexTile tile)) continue;
-
-            TowerBase tower = tile.CurrentTower;
-            if (!IsValidTarget(tower)) continue;
-
-            int distance = originTile.Coordinates.DistanceTo(rangeTiles[i]);
-            bool isObjective = tower.GetComponent<TowerObjective>() != null;
-
-            if (distance < bestDistance || (distance == bestDistance && isObjective && !bestIsObjective))
-            {
-                best = tower;
-                bestDistance = distance;
-                bestIsObjective = isObjective;
-            }
-        }
-
-        if (best != null) DamageTower(ctx, best, carry, true, out _);
-    }
-
-    private float DamageTower(TurnContext ctx, TowerBase tower, float raw, bool ignoreDefense, out float overkill)
-    {
-        float dealt = tower.ApplyDamage(raw, ignoreDefense, out overkill);
-
-        if (dealt > 0f)
-        {
-            ctx.Log($"{entityBase.EntityName} hits {tower.TowerName} for {dealt:0}");
-            if (Has(AbilityKeyword.Lifedrain)) entityBase.Heal(dealt);
-        }
-        else
-        {
-            ctx.Log($"{tower.TowerName} blocks {entityBase.EntityName}");
-        }
-
-        return dealt;
-    }
-
-    private bool IsValidTarget(TowerBase tower)
-    {
-        if (tower == null || tower.IsDead || !tower.IsShrineSide) return false;
-        return canTargetLanterns || tower.GetComponent<TowerObjective>() != null;
     }
 
     private IEnumerator MoveVisual(TurnContext ctx, Vector3 from, Vector3 to, float seconds)

@@ -14,9 +14,9 @@ public enum PlacementDenyReason
 }
 
 /// <summary>
-/// ตรวจกฎการวางสิ่งก่อสร้างทั้งหมดพร้อมเหตุผล และ Valid Threat Check ของป้อมโจมตีที่ผู้เล่นวางเอง:
-/// Facing ที่หมุนด้วย Q / E ต้องมีช่อง Path อยู่ใน Range Pattern อย่างน้อย minThreatPathTiles ช่อง
-/// ป้อมที่ศาลเสกเองใช้ FindBestFacing หันเข้าทิศที่มี Path มากที่สุดอัตโนมัติ (เสมอกันใช้ GameRandom)
+/// จุดเดียวที่ตรวจกฎการวางสิ่งก่อสร้างทั้งหมด:
+/// - CheckTileRules: กฎระดับช่อง (ว่าง, ประเภทพื้น, ติดทางเดิน, ห้ามวางศาลติดกัน) ใช้ทั้งตอนไฮไลต์ช่องและตอนวางจริง
+/// - Check: กฎเต็มรูปแบบสำหรับผู้เล่นวางการ์ด (รวมตรวจเฟสและ Valid Threat Check ตามทิศ Facing)
 /// </summary>
 public static class ThreatPlacementValidator
 {
@@ -62,10 +62,12 @@ public static class ThreatPlacementValidator
         return count;
     }
 
-    /// <summary>ตรวจทุกกฎการวาง คืน None ถ้าวางได้</summary>
-    public static PlacementDenyReason Check(TowerBase prefab, HexTile tile, int facing, LoopPathManager board)
+    /// <summary>
+    /// ตรวจกฎระดับช่องล้วนๆ (ไม่ขึ้นกับเฟสและทิศการหมุน)
+    /// TowerBase.CanPlaceOnTile เรียกตัวนี้เพื่อให้ชุดกฎอยู่ที่เดียว
+    /// </summary>
+    public static PlacementDenyReason CheckTileRules(TowerBase prefab, HexTile tile, LoopPathManager board)
     {
-        if (!GameStateManager.IsPlayerActionPhase) return PlacementDenyReason.WrongPhase;
         if (prefab == null || tile == null) return PlacementDenyReason.Occupied;
         if (tile.HasTower) return PlacementDenyReason.Occupied;
         if (!prefab.CanPlaceOn(tile.GroundType)) return PlacementDenyReason.GroundType;
@@ -83,11 +85,22 @@ public static class ThreatPlacementValidator
             {
                 return PlacementDenyReason.AdjacentShrine;
             }
+        }
 
-            if (IsThreatPrefab(prefab) && CountPathTilesInRange(prefab, tile.Coordinates, facing, board) < GetMinPathTiles())
-            {
-                return PlacementDenyReason.NoThreatPath;
-            }
+        return PlacementDenyReason.None;
+    }
+
+    /// <summary>ตรวจทุกกฎการวางของการ์ดผู้เล่น คืน None ถ้าวางได้</summary>
+    public static PlacementDenyReason Check(TowerBase prefab, HexTile tile, int facing, LoopPathManager board)
+    {
+        if (!GameStateManager.IsPlayerActionPhase) return PlacementDenyReason.WrongPhase;
+
+        PlacementDenyReason tileReason = CheckTileRules(prefab, tile, board);
+        if (tileReason != PlacementDenyReason.None) return tileReason;
+
+        if (board != null && IsThreatPrefab(prefab) && CountPathTilesInRange(prefab, tile.Coordinates, facing, board) < GetMinPathTiles())
+        {
+            return PlacementDenyReason.NoThreatPath;
         }
 
         return PlacementDenyReason.None;

@@ -169,25 +169,15 @@ public class HoverRaycaster : SingletonBehaviour<HoverRaycaster>
             return;
         }
 
-        HexPatternContext pctx = BoardPatternContext.Get();
-        HexCoordinates origin = entity.OccupiedTile.Coordinates;
-        attacker.Pattern.CollectRangeTiles(origin, entity.Facing, rangeBuffer, pctx);
-
-        hitBuffer.Clear();
-        LoopPathManager board = LoopPathManager.Instance;
-        if (board != null)
-        {
-            for (int i = 0; i < rangeBuffer.Count; i++)
-            {
-                if (board.TryGetTileAt(rangeBuffer[i], out HexTile tile)
-                    && tile.HasTower
-                    && tile.CurrentTower.IsShrineSide)
-                {
-                    attacker.Pattern.CollectHitTiles(origin, entity.Facing, rangeBuffer[i], rangeBuffer, hitBuffer, pctx);
-                    break;
-                }
-            }
-        }
+        CombatResolver.CollectPreviewRangeAndHit(
+            entity.OccupiedTile.Coordinates,
+            entity.Facing,
+            attacker.Pattern,
+            BoardPatternContext.Get(),
+            fromSpirit: true,
+            canTargetLanterns: attacker.CanTargetLanterns,
+            rangeBuffer,
+            hitBuffer);
 
         RangeIndicator.Instance.Show(this, rangeBuffer, hitBuffer, false);
     }
@@ -201,23 +191,15 @@ public class HoverRaycaster : SingletonBehaviour<HoverRaycaster>
             return;
         }
 
-        HexPatternContext pctx = BoardPatternContext.ForTower();
-        HexCoordinates origin = tower.CurrentTile.Coordinates;
-        attacker.Pattern.CollectRangeTiles(origin, tower.Facing, rangeBuffer, pctx);
-
-        hitBuffer.Clear();
-        LoopPathManager board = LoopPathManager.Instance;
-        if (board != null)
-        {
-            for (int i = 0; i < rangeBuffer.Count; i++)
-            {
-                if (board.TryGetTileAt(rangeBuffer[i], out HexTile tile) && tile.HasEntity)
-                {
-                    attacker.Pattern.CollectHitTiles(origin, tower.Facing, rangeBuffer[i], rangeBuffer, hitBuffer, pctx);
-                    break;
-                }
-            }
-        }
+        CombatResolver.CollectPreviewRangeAndHit(
+            tower.CurrentTile.Coordinates,
+            tower.Facing,
+            attacker.Pattern,
+            BoardPatternContext.ForTower(),
+            fromSpirit: false,
+            canTargetLanterns: true,
+            rangeBuffer,
+            hitBuffer);
 
         RangeIndicator.Instance.Show(this, rangeBuffer, hitBuffer, true);
     }

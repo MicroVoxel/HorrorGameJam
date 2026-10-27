@@ -3,7 +3,7 @@ using UnityEngine;
 
 /// <summary>
 /// แจกการ์ดเริ่มต้นตามกติกา GDD v2 (2.1 และ 5.1):
-/// - ในเฟส Dawn: แจกเฉพาะการ์ดศาลเจ้าตามจำนวน GameRulesData.RequiredShrines เท่านั้น (ยังไม่มีการ์ดอื่น)
+/// - ในเฟส Dawn: แจกเฉพาะการ์ดศาลเจ้าตามจำนวน ObjectiveTracker.RequiredShrinesToPlace เท่านั้น
 /// - เมื่อเริ่ม Planning ของ Round 1: แจกการ์ดรังผีเริ่มต้นตามจำนวน GameRulesData.StartingSpawnerCards
 /// </summary>
 [DisallowMultipleComponent]
@@ -14,7 +14,7 @@ public class SetupPhaseDeckSeeder : MonoBehaviour
 
     [Header("Dawn Shrine Cards (จำนวนอ่านจาก GameRulesData.RequiredShrines)")]
     [SerializeField] private CardData shrineCardData;
-    [Tooltip("ค่าสำรองกรณีไม่มี GameStateManager ในฉาก")]
+    [Tooltip("ค่าสำรองกรณีไม่มี GameStateManager และ ObjectiveTracker ในฉาก")]
     [SerializeField, Min(1)] private int fallbackShrineCardCount = 2;
 
     [Header("Round 1 Spawner Cards Pool (จำนวนที่แจกอ่านจาก GameRulesData.StartingSpawnerCards)")]
@@ -37,7 +37,6 @@ public class SetupPhaseDeckSeeder : MonoBehaviour
 
         DealDawnShrineHand();
 
-        // กรณีเริ่มฉากมาแล้วอยู่ใน Planning ของ Round 1 แล้ว
         if (GameStateManager.IsPlanning && GameStateManager.CurrentRound == 1)
         {
             DealRoundOneSpawnerCards();
@@ -60,21 +59,16 @@ public class SetupPhaseDeckSeeder : MonoBehaviour
         }
     }
 
-    /// <summary>แจกเฉพาะการ์ดศาลเจ้าในเฟส Dawn ตามจำนวน RequiredShrines ใน GameRulesData</summary>
+    /// <summary>แจกเฉพาะการ์ดศาลเจ้าในเฟส Dawn ตามจำนวน RequiredShrines</summary>
     [ContextMenu("Deal Dawn Shrine Hand")]
     public void DealDawnShrineHand()
     {
         if (dealtDawnShrines) return;
         dealtDawnShrines = true;
 
-        int requiredShrines = GameStateManager.Instance != null
-            ? GameStateManager.Instance.Rules.RequiredShrines
-            : Mathf.Max(1, fallbackShrineCardCount);
-
-        if (ObjectiveTracker.Instance != null)
-        {
-            ObjectiveTracker.Instance.SetRequiredShrinesCount(requiredShrines);
-        }
+        int requiredShrines = ObjectiveTracker.Instance != null
+            ? ObjectiveTracker.Instance.RequiredShrinesToPlace
+            : (GameStateManager.Instance != null ? GameStateManager.Instance.Rules.RequiredShrines : Mathf.Max(1, fallbackShrineCardCount));
 
         if (deckController == null) deckController = CardDeckController.Instance;
         if (deckController == null)

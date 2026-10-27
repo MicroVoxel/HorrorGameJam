@@ -9,9 +9,6 @@ using UnityEngine;
 /// ลำดับใน 1 เทิร์น:
 ///   1. Start of Turn  2. Spawner Step  3. Quick Step  4. Entity Step (หัวขบวนก่อน)
 ///   5. Tower Step     6. รอแอนิเมชันที่ปล่อยพร้อมกันให้จบ  7. Last Breath แล้วจึง Cleanup  8. End of Turn
-///
-/// เริ่มเองเมื่อ GameState เป็น Resolution และเรียก GameStateManager.CompleteResolution() เมื่อครบเทิร์น
-/// ถ้าเกมจบ (Ended) กลางคันจะหยุดทันที
 /// </summary>
 [DisallowMultipleComponent]
 public class TurnManager : SingletonBehaviour<TurnManager>
@@ -31,8 +28,6 @@ public class TurnManager : SingletonBehaviour<TurnManager>
     public TurnContext Context => context;
     public int CurrentTurn => context != null ? context.Turn : 0;
     public int TotalTurns => context != null ? context.TotalTurns : 0;
-
-    // FIX บัก 5: อ่านค่า Skip เฉพาะตอนกำลังรันอยู่ ไม่งั้น context เก่าของ Round ก่อนทำให้ปุ่ม Skip ค้างเป็นสีเทา
     public bool IsFastForward => isRunning && context != null && context.IsFastForward;
 
     public int SpeedIndex => ResolveSpeedIndex();
@@ -41,25 +36,13 @@ public class TurnManager : SingletonBehaviour<TurnManager>
         : 1f;
 
     // ---------- Events ----------
-    /// <summary>เริ่ม Resolution (พารามิเตอร์: Round, จำนวนเทิร์น)</summary>
     public event Action<int, int> OnResolutionStarted;
-
-    /// <summary>เริ่มเทิร์น (พารามิเตอร์: เทิร์นที่, จำนวนเทิร์นทั้งหมด)</summary>
     public event Action<int, int> OnTurnStarted;
-
-    /// <summary>เทิร์นจบ หลัง Cleanup และ OnTurnEnd ของทุกตัวแล้ว</summary>
     public event Action<int, int> OnTurnEnded;
-
-    /// <summary>ขั้น Cleanup ของเทิร์น (หลัง Last Breath จบแล้ว): ระบบอื่นเก็บศพ ดรอป เช็กกลายพันธุ์ เช็ก Victory/Extinction ผ่าน Event นี้</summary>
     public event Action<TurnContext> OnTurnCleanup;
-
-    /// <summary>จบ Resolution (true = จบก่อนครบเทิร์นเพราะไม่เหลืออะไรเกิดขึ้นอีก)</summary>
     public event Action<bool> OnResolutionFinished;
-
     public event Action<int> OnSpeedChanged;
     public event Action OnFastForwardStarted;
-
-    /// <summary>ข้อความ Event Log จาก ctx.Log()</summary>
     public event Action<string> OnLogMessage;
 
     private void Start()
@@ -80,7 +63,7 @@ public class TurnManager : SingletonBehaviour<TurnManager>
         base.OnDestroy();
     }
 
-    // ---------- Public controls (SpeedControlUI ใช้ใน Part 5) ----------
+    // ---------- Public controls ----------
 
     public void SetSpeedIndex(int index)
     {
@@ -105,7 +88,6 @@ public class TurnManager : SingletonBehaviour<TurnManager>
         SetSpeedIndex((ResolveSpeedIndex() + 1) % count);
     }
 
-    /// <summary>Skip: รันเทิร์นที่เหลือโดยไม่แอนิเมต (Logic เท่าเดิมเพราะใช้ GameRandom แบบ Seeded)</summary>
     [ContextMenu("Fast Forward (Test)")]
     public void RequestFastForward()
     {
@@ -123,13 +105,12 @@ public class TurnManager : SingletonBehaviour<TurnManager>
         {
             if (!isRunning)
             {
-                isRunning = true; // ตั้งก่อน StartCoroutine เสมอ
+                isRunning = true;
                 resolutionRoutine = StartCoroutine(RunResolution());
             }
         }
         else if (isRunning)
         {
-            // ออกจาก Resolution กลางคัน (เช่น ชนะหรือแพ้ระหว่างเทิร์น)
             if (resolutionRoutine != null) StopCoroutine(resolutionRoutine);
             resolutionRoutine = null;
             isRunning = false;
@@ -142,11 +123,8 @@ public class TurnManager : SingletonBehaviour<TurnManager>
         int round = GameStateManager.CurrentRound;
         int totalTurns = Mathf.Max(1, GameStateManager.TurnsThisRound);
 
-        // สร้าง context ใหม่ทันที (IsFastForward ของ Round ก่อนจะไม่ค้างมา)
         context = new TurnContext(round, totalTurns, PostLog) { SpeedMultiplier = SpeedMultiplier };
 
-        // รอ 1 เฟรม เพื่อให้ StartCoroutine คืนค่ากลับไปก่อน
-        // และให้ handler อื่นของ OnStateChanged(Resolution) ทำงานครบ ก่อนเริ่มเทิร์นแรก
         yield return null;
         if (!GameStateManager.IsResolution)
         {
@@ -168,14 +146,13 @@ public class TurnManager : SingletonBehaviour<TurnManager>
 
             if (!GameStateManager.IsResolution) break;
 
-            if (rules.EndResolutionEarlyOnWipe && turn < totalTurns && NothingLeftToHappen())
+            if (rules.EndResolutionEarlyOnWipe && turn < totalTurns && !TurnActorRegistry.HasActiveParadeOrSpawner())
             {
                 endedEarly = true;
                 break;
             }
         }
 
-        // ปลดสถานะก่อนเรียก CompleteResolution เสมอ
         resolutionRoutine = null;
         isRunning = false;
 
@@ -214,8 +191,6 @@ public class TurnManager : SingletonBehaviour<TurnManager>
         yield return WaitForAnimations();
 
         // 7. Last Breath ก่อน แล้วจึง Cleanup
-        // FIX บัก 4: ระเบิด Last Breath (รวมลูกโซ่) ให้เสร็จก่อน เพื่อให้ Victory/Extinction เห็นผลลัพธ์ครบ
-        // ไม่ขึ้นกับว่าระบบไหน subscribe OnTurnCleanup ก่อนกัน
         AbilityResolver.ResolvePending(context);
         if (!GameStateManager.IsResolution) yield break;
 
@@ -231,7 +206,6 @@ public class TurnManager : SingletonBehaviour<TurnManager>
 
         OnTurnEnded?.Invoke(context.Turn, context.TotalTurns);
 
-        // หน่วงท้ายเทิร์น (ข้ามถ้าเทิร์นว่างและเปิด Auto Skip Empty Turns)
         if (!rules.AutoSkipEmptyTurns || context.ActionPerformedThisTurn)
         {
             yield return context.Pause(rules.TurnStepDelay);
@@ -258,7 +232,6 @@ public class TurnManager : SingletonBehaviour<TurnManager>
     {
         quickActors.Clear();
 
-        // ผีหัวขบวนก่อน แล้วจึงป้อม
         TurnActorRegistry.CollectSorted(TurnActorGroup.Entity, buffer);
         for (int i = 0; i < buffer.Count; i++)
         {
@@ -273,7 +246,6 @@ public class TurnManager : SingletonBehaviour<TurnManager>
 
         for (int i = 0; i < quickActors.Count; i++)
         {
-            // ตัวที่ตายใน Quick Step (จากตัวก่อนหน้า) จะไม่ได้ทำ action ต่อ
             if (!TurnActorRegistry.IsUsable(quickActors[i])) continue;
 
             yield return ((IQuickActor)quickActors[i]).ExecuteQuickAction(context);
@@ -307,12 +279,6 @@ public class TurnManager : SingletonBehaviour<TurnManager>
         }
 
         context.ResetAnimations();
-    }
-
-    /// <summary>ไม่มีผีเหลือและไม่มีรังผีที่ยังเสกได้ = ไม่มีอะไรเกิดขึ้นอีกแล้ว</summary>
-    private static bool NothingLeftToHappen()
-    {
-        return EntityRegistry.ActiveCount == 0 && !TurnActorRegistry.AnyActive(TurnActorGroup.Spawner);
     }
 
     private int ResolveSpeedIndex()

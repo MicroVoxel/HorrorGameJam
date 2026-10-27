@@ -4,21 +4,15 @@ using UnityEngine;
 
 /// <summary>
 /// ตรวจจับสภาวะ "ขบวนผีสูญพันธุ์" (Extinction Defeat) ตาม GDD 2.3 และ 4.2:
-/// เช็กหลังทุกขั้น Cleanup ของเทิร์น (TurnManager.OnTurnCleanup) และหลัง RoundEnd ประมวลผลจบ:
-/// 1. ไม่มีผีที่มีชีวิตอยู่บนทางเดินเลย (EntityRegistry.ActiveCount == 0)
-/// 2. ไม่มีรังผี (TowerSpawnable) ตั้งอยู่บนกระดานที่จะผลิตผีออกมาได้อีก
-/// 3. ไม่มีการ์ดรังผีในมือ (และไม่มีการ์ดรังผีรอแจกอยู่ใน LootStash)
-/// หากศาลเจ้าทั้งหมดพังใน Cleanup เดียวกัน จะให้สิทธิ์ Victory ก่อนเสมอ
-///
-/// FIX บัก 9: ถ้า Planning ถัดไปจะจั่วการ์ดให้ (CardsDrawnPerRound) และกองจั่วมีการ์ดรังผีอยู่
-/// จะยังไม่ตัดสินแพ้ทันที แต่รอให้จั่วเสร็จตอนเริ่ม Round ใหม่ แล้วค่อยตัดสินอีกครั้ง
+/// ใช้ TurnActorRegistry.HasActiveParadeOrSpawner() ร่วมกับ TurnManager เพื่อเป็นนิยามเดียวกันทั้งเกม
+/// หากศาลเจ้าทั้งหมดพังใน Cleanup เดียวกัน จะให้สิทธิ์ ObjectiveTracker ตัดสิน Victory ก่อนเสมอ
 /// </summary>
 [DisallowMultipleComponent]
 public class ParadeExtinctionChecker : MonoBehaviour
 {
     private bool subscribedToTurns;
     private bool subscribedToState;
-    private bool deferredToNextRound; // FIX บัก 9: เจอสภาพสูญพันธุ์แล้ว แต่รอผลการจั่วของ Round ถัดไป
+    private bool deferredToNextRound;
 
     private void OnEnable()
     {
@@ -72,17 +66,14 @@ public class ParadeExtinctionChecker : MonoBehaviour
 
     private void HandleGameStateChanged(GameState state)
     {
-        // แค่ลองสมัครรับ event ที่ยังไม่ได้ต่อ (ตัวเช็ก RoundEnd ย้ายไป HandleRoundEndProcessed แล้ว)
         TrySubscribe();
     }
 
-    // FIX บัก 9: เช็กหลังของเน่าและ loot แจกเสร็จแล้ว (การ์ดรังที่เพิ่งดรอปอยู่ในมือแล้ว)
     private void HandleRoundEndProcessed()
     {
         EvaluateExtinctionCondition();
     }
 
-    // FIX บัก 9: ตัดสินที่ค้างไว้ หลังการจั่วของ Round ใหม่เสร็จ
     private void HandleRoundStarted(int round, int turns)
     {
         if (!deferredToNextRound) return;
@@ -91,7 +82,6 @@ public class ParadeExtinctionChecker : MonoBehaviour
 
     private IEnumerator EvaluateAfterDraw()
     {
-        // รอ 1 เฟรม ให้ CardDeckController จั่วการ์ดของ Round นี้เสร็จทุกกรณี ไม่ขึ้นกับลำดับ subscribe
         yield return null;
 
         deferredToNextRound = false;
@@ -107,34 +97,22 @@ public class ParadeExtinctionChecker : MonoBehaviour
     {
         if (GameStateManager.IsDawn || GameStateManager.IsEnded) return;
 
-        // หากศาลเจ้าถูกทำลายครบหมดแล้ว ให้ตัดสินเป็น Victory ก่อนเสมอ (เช่น ผีตัวสุดท้ายระเบิด Last Breath พังศาลหลังสุดท้าย)
-        if (ObjectiveTracker.Instance != null && ObjectiveTracker.Instance.IsSetupComplete)
+        // หากศาลเจ้าถูกทำลายครบหมดแล้ว ให้ ObjectiveTracker ตัดสิน Victory ก่อนเสมอ
+        if (ObjectiveTracker.Instance != null
+            && ObjectiveTracker.Instance.IsSetupComplete
+            && ObjectiveTracker.Instance.TargetCount == 0)
         {
-            if (ObjectiveTracker.Instance.TargetCount == 0)
-            {
-                ObjectiveTracker.Instance.EvaluateVictoryAfterCleanup();
-                return;
-            }
+            ObjectiveTracker.Instance.EvaluateVictoryAfterCleanup();
+            return;
         }
 
-        // 1. ยังมีผีเดินอยู่บนถนนหรือไม่
-        if (EntityRegistry.ActiveCount > 0) return;
-
-        // 2. ยังมีรังผี (TowerSpawnable) ที่วางอยู่บนกระดานและยังไม่พังหรือไม่
-        IReadOnlyList<TowerBase> towers = TowerBase.ActiveTowers;
-        for (int i = 0; i < towers.Count; i++)
-        {
-            TowerBase tower = towers[i];
-            if (tower != null && !tower.IsDead && tower.GetComponent<TowerSpawnable>() != null)
-            {
-                return;
-            }
-        }
+        // 1 & 2. ยังมีผีบนทางเดินหรือรังผีที่ยังเสกผีได้บนกระดานหรือไม่ (ฟังก์ชันกลางร่วมกับ TurnManager)
+        if (TurnActorRegistry.HasActiveParadeOrSpawner()) return;
 
         // 3. ในมือ (หรือใน LootStash ที่กำลังจะแจกตอนจบ Round) ยังมีการ์ดรังผีให้วางแก้เกมหรือไม่
         if (HasSpawnerCardAvailable()) return;
 
-        // FIX บัก 9: Planning ถัดไปอาจจั่วได้การ์ดรังผี ให้รอผลการจั่วก่อนตัดสิน
+        // 4. Planning ถัดไปอาจจั่วได้การ์ดรังผี ให้รอผลการจั่วก่อนตัดสิน
         if (allowDefer && CouldDrawSpawnerNextRound())
         {
             deferredToNextRound = true;
@@ -148,7 +126,6 @@ public class ParadeExtinctionChecker : MonoBehaviour
         }
     }
 
-    /// <summary>Round ถัดไปยังมี และจะจั่วการ์ด และกองจั่วมีการ์ดรังผีอยู่ (ถ้าไม่มี การรอก็ไม่ช่วยอะไร)</summary>
     private static bool CouldDrawSpawnerNextRound()
     {
         GameStateManager gsm = GameStateManager.Instance;

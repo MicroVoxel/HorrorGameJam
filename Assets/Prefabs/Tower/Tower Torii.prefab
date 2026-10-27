@@ -86,6 +86,9 @@ MonoBehaviour:
   maxHealth: 50
   currentHealth: 0
   defense: 0
+  facing: 0
+  rotateModelWithFacing: 0
+  facingYawOffset: 0
   altarDefenseBonus: 0
   altarDamageReduction: 0
   altarArmorStripped: 0
@@ -102,7 +105,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::TowerSpawnable
   entityPrefab: {fileID: 2898295033207443421, guid: a00b9e81efb157249be5e02b0b34d848, type: 3}
-  spawnInterval: 8
-  maxConcurrentEntities: 3
+  spawnEveryTurns: 1
+  maxConcurrentEntities: 1
   triggerOnPlaced: 1
   initialSpawnCountOnPlaced: 1

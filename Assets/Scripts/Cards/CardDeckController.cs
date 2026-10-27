@@ -7,16 +7,13 @@ using UnityEngine;
 /// </summary>
 public enum HandFullBehavior
 {
-    DiscardOldest,  // สลายการ์ดใบซ้ายสุดแล้วรับใบใหม่ (สไตล์ Loop Hero)
-    RejectNew       // ไม่รับการ์ดใหม่ การ์ดที่เข้ามาจะหายไป
+    DiscardOldest,
+    RejectNew
 }
 
 /// <summary>
 /// ควบคุมแถบการ์ดในมือผู้เล่นแนวนอนสไตล์ Loop Hero
-/// v2 (4C):
-/// - ไม่สุ่มจั่วการ์ดมั่วในเฟส Dawn (ใน Dawn มีเฉพาะการ์ดศาลเจ้าจาก SetupPhaseDeckSeeder)
-/// - จั่วการ์ดอัตโนมัติตาม GameRulesData.CardsDrawnPerRound เมื่อเริ่ม Planning ของแต่ละ Round
-/// - ใช้ GameRandom สำหรับการสุ่มจั่วการ์ด และคัดกรองไม่ให้สุ่มได้การ์ดศาลเจ้า (TowerObjective) ในตอนกลางคืน
+/// เพดานมือการ์ดอ่านจาก GameRulesData.MaxHandSize
 /// </summary>
 [DisallowMultipleComponent]
 public class CardDeckController : SingletonBehaviour<CardDeckController>
@@ -28,7 +25,8 @@ public class CardDeckController : SingletonBehaviour<CardDeckController>
     [Header("Deck Configuration")]
     [SerializeField] private List<CardData> availableCards = new List<CardData>();
     [SerializeField] private int startingHandSize = 0;
-    [SerializeField] private int maxHandSize = 7;
+    [Tooltip("ค่าสำรองกรณีไม่มี GameStateManager ในฉาก")]
+    [SerializeField, Min(1)] private int fallbackMaxHandSize = 7;
     [Tooltip("จั่วการ์ดประจำ Round (cardsDrawnPerRound) ตั้งแต่วันแรก (Round 1) ด้วยหรือไม่")]
     [SerializeField] private bool drawPerRoundOnRoundOne = true;
 
@@ -41,8 +39,10 @@ public class CardDeckController : SingletonBehaviour<CardDeckController>
 
     public IReadOnlyList<CardUI> CardsInHand => cardsInHand;
     public int CardCount => cardsInHand.Count;
-    public int MaxHandSize => maxHandSize;
-    public bool IsHandFull => cardsInHand.Count >= maxHandSize;
+    public int MaxHandSize => GameStateManager.Instance != null
+        ? GameStateManager.Instance.Rules.MaxHandSize
+        : Mathf.Max(1, fallbackMaxHandSize);
+    public bool IsHandFull => cardsInHand.Count >= MaxHandSize;
     public HandFullBehavior FullBehavior => handFullBehavior;
 
     /// <summary>ส่งสัญญาณเมื่อการ์ดใหม่ถูกปฏิเสธเพราะมือเต็ม (ใช้ทำ UI แจ้งเตือนได้)</summary>
@@ -76,7 +76,6 @@ public class CardDeckController : SingletonBehaviour<CardDeckController>
     private void Update()
     {
 #if UNITY_EDITOR
-        // กดปุ่ม C เพื่อทดสอบจั่วการ์ดในโหมดพัฒนา
         if (IsDrawShortcutPressed())
         {
             DrawRandomCard();
@@ -139,13 +138,11 @@ public class CardDeckController : SingletonBehaviour<CardDeckController>
         return null;
     }
 
-    // FIX บัก 9: ให้ ParadeExtinctionChecker ถามว่าการจั่วครั้งหน้าอาจได้การ์ดรังผีหรือไม่
     /// <summary>กองที่ใช้จั่วจริง (ตัดการ์ดศาลเจ้าแล้ว) มีการ์ดรังผีอยู่หรือไม่</summary>
     public bool CanDrawSpawnerCard()
     {
         RebuildNightDrawablePool();
 
-        // ใช้กองเดียวกับ PickRandomPoolCard: ถ้ากองกลางคืนว่างจะถอยไปใช้ availableCards
         IReadOnlyList<CardData> pool = nightDrawablePool.Count > 0 ? (IReadOnlyList<CardData>)nightDrawablePool : availableCards;
         if (pool == null) return false;
 
@@ -171,7 +168,6 @@ public class CardDeckController : SingletonBehaviour<CardDeckController>
             CardData card = availableCards[i];
             if (card == null) continue;
 
-            // ไม่สุ่มแจกการ์ดศาลเจ้าเป้าหมายหลักซ้ำในช่วงกลางคืน
             if (card.TowerPrefab != null && card.TowerPrefab.GetComponent<TowerObjective>() != null)
             {
                 continue;
@@ -192,7 +188,7 @@ public class CardDeckController : SingletonBehaviour<CardDeckController>
         {
             if (handFullBehavior == HandFullBehavior.RejectNew)
             {
-                Debug.Log($"<color=orange>[CardDeck]</color> Hand full ({cardsInHand.Count}/{maxHandSize}), rejected '{data.CardName}'");
+                Debug.Log($"<color=orange>[CardDeck]</color> Hand full ({cardsInHand.Count}/{MaxHandSize}), rejected '{data.CardName}'");
                 OnCardRejected?.Invoke(data);
                 return null;
             }

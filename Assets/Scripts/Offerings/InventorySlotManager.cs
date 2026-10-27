@@ -3,37 +3,33 @@ using System.Collections.Generic;
 using UnityEngine;
 
 /// <summary>
-/// ระบบกระเป๋าเก็บของช่องเดี่ยวสไตล์ Loop Hero (1 ช่อง = 1 ชิ้น ไม่ต้องหมุนจัดขนาด)
-/// หากกระเป๋าเต็ม (ค่าเริ่มต้น 8 ช่อง) แล้วมีของดรอปเข้ามาใหม่ ของชิ้นเก่าสุดในช่องที่ 0 จะถูกดันสลายไปอัตโนมัติ
-///
-/// FIX บัก 7: กระเป๋าจำ "อายุที่เหลือ (Round)" ของแต่ละชิ้นไว้ด้วย (ลิสต์ขนานกับ items)
-/// ของที่ถอดจากแท่นตอนยังสดจะกลับมาพร้อมอายุเดิม ไม่ได้รีเซ็ตเป็นเต็มอายุ
-/// ของที่ได้ใหม่ (ดรอป / เริ่มเกม) ใช้อายุเต็มตาม DecayLoops
+/// ระบบกระเป๋าเก็บของช่องเดี่ยวสไตล์ Loop Hero (1 ช่อง = 1 ชิ้น)
+/// เก็บเป็น List<OfferingInstance> ลิสต์เดียว (รวมไอเทมและอายุที่เหลือไว้ด้วยกัน ไม่ใช้ลิสต์คู่ขนาน)
+/// ความจุอ่านจาก GameRulesData.MaxBackpackSlots
 /// </summary>
 [DisallowMultipleComponent]
 public class InventorySlotManager : SingletonBehaviour<InventorySlotManager>
 {
-
-    [Header("Backpack Capacity (Loop Hero Single-Slot)")]
-    [SerializeField] private int maxSlots = 8;
-    [SerializeField] private List<OfferingItemData> items = new List<OfferingItemData>();
+    [Header("Backpack Capacity (Fallback when GameStateManager is absent)")]
+    [SerializeField, Min(1)] private int fallbackMaxSlots = 8;
+    [SerializeField] private List<OfferingInstance> entries = new List<OfferingInstance>();
 
     [Header("Starting Test Items (Optional)")]
     [SerializeField] private List<OfferingItemData> initialTestItems = new List<OfferingItemData>();
 
-    // FIX บัก 7: อายุที่เหลือของแต่ละชิ้น index ตรงกับ items (ไม่ Serialize ปรับให้ตรงกันอัตโนมัติด้วย EnsureRemainingSynced)
-    private readonly List<int> remainingRounds = new List<int>();
-
-    public IReadOnlyList<OfferingItemData> Items => items;
-    public int MaxSlots => maxSlots;
-    public int CurrentItemCount => items.Count;
+    public IReadOnlyList<OfferingInstance> Entries => entries;
+    public int MaxSlots => GameStateManager.Instance != null
+        ? GameStateManager.Instance.Rules.MaxBackpackSlots
+        : Mathf.Max(1, fallbackMaxSlots);
+    public int CurrentItemCount => entries.Count;
 
     public event Action OnInventoryChanged;
     public event Action<OfferingItemData> OnItemOverflowDisintegrated;
 
-
     private void Start()
     {
+        EnsureEntriesInitialized();
+
         for (int i = 0; i < initialTestItems.Count; i++)
         {
             if (initialTestItems[i] != null)
@@ -43,19 +39,20 @@ public class InventorySlotManager : SingletonBehaviour<InventorySlotManager>
         }
     }
 
-    // FIX บัก 7: กันกรณีแก้ items ใน Inspector แล้วลิสต์อายุไม่ตรง (เติมด้วยอายุเต็ม / ตัดส่วนเกิน)
-    private void EnsureRemainingSynced()
+    private void EnsureEntriesInitialized()
     {
-        while (remainingRounds.Count < items.Count)
+        for (int i = 0; i < entries.Count; i++)
         {
-            OfferingItemData item = items[remainingRounds.Count];
-            remainingRounds.Add(item != null ? item.DecayLoops : 1);
+            OfferingInstance inst = entries[i];
+            inst.EnsureInitialized();
+            entries[i] = inst;
         }
+    }
 
-        while (remainingRounds.Count > items.Count)
-        {
-            remainingRounds.RemoveAt(remainingRounds.Count - 1);
-        }
+    public void AddItem(OfferingInstance instance)
+    {
+        if (!instance.IsValid) return;
+        AddItem(instance.data, instance.remainingDecayLoops);
     }
 
     /// <summary>
@@ -66,46 +63,46 @@ public class InventorySlotManager : SingletonBehaviour<InventorySlotManager>
     {
         if (newItem == null) return;
 
-        EnsureRemainingSynced();
-
-        if (items.Count >= maxSlots && items.Count > 0)
+        int cap = MaxSlots;
+        if (entries.Count >= cap && entries.Count > 0)
         {
-            OfferingItemData overflow = items[0];
-            items.RemoveAt(0);
-            remainingRounds.RemoveAt(0);
-            Debug.Log($"<color=orange>[Backpack Overflow]</color> กระเป๋าเต็ม! '{overflow.ItemName}' ถูกดันตกกระดานและสลายเป็นไอวิญญาณ");
-            OnItemOverflowDisintegrated?.Invoke(overflow);
+            OfferingItemData overflow = entries[0].data;
+            entries.RemoveAt(0);
+            if (overflow != null)
+            {
+                Debug.Log($"<color=orange>[Backpack Overflow]</color> กระเป๋าเต็ม! '{overflow.ItemName}' ถูกดันตกกระดานและสลายเป็นไอวิญญาณ");
+                OnItemOverflowDisintegrated?.Invoke(overflow);
+            }
         }
 
-        int life = remaining > 0 ? Mathf.Min(remaining, newItem.DecayLoops) : newItem.DecayLoops;
-
-        items.Add(newItem);
-        remainingRounds.Add(life);
+        entries.Add(OfferingInstance.CreateFresh(newItem, remaining));
         OnInventoryChanged?.Invoke();
+    }
+
+    public OfferingInstance GetInstanceAt(int slotIndex)
+    {
+        if (slotIndex < 0 || slotIndex >= entries.Count) return default;
+        OfferingInstance inst = entries[slotIndex];
+        inst.EnsureInitialized();
+        return inst;
     }
 
     public OfferingItemData GetItemAt(int slotIndex)
     {
-        if (slotIndex < 0 || slotIndex >= items.Count) return null;
-        return items[slotIndex];
+        return GetInstanceAt(slotIndex).data;
     }
 
     /// <summary>อายุที่เหลือ (Round) ของชิ้นในช่องนี้ (ไม่มีของ = 0)</summary>
     public int GetRemainingAt(int slotIndex)
     {
-        if (slotIndex < 0 || slotIndex >= items.Count) return 0;
-
-        EnsureRemainingSynced();
-        return remainingRounds[slotIndex];
+        return GetInstanceAt(slotIndex).remainingDecayLoops;
     }
 
     public bool RemoveItemAt(int slotIndex)
     {
-        if (slotIndex < 0 || slotIndex >= items.Count) return false;
+        if (slotIndex < 0 || slotIndex >= entries.Count) return false;
 
-        EnsureRemainingSynced();
-        items.RemoveAt(slotIndex);
-        remainingRounds.RemoveAt(slotIndex);
+        entries.RemoveAt(slotIndex);
         OnInventoryChanged?.Invoke();
         return true;
     }
@@ -114,35 +111,33 @@ public class InventorySlotManager : SingletonBehaviour<InventorySlotManager>
     {
         if (item == null) return false;
 
-        int index = items.IndexOf(item);
-        if (index < 0) return false;
+        for (int i = 0; i < entries.Count; i++)
+        {
+            if (entries[i].data == item)
+            {
+                return RemoveItemAt(i);
+            }
+        }
 
-        return RemoveItemAt(index);
+        return false;
     }
 
     /// <summary>
-    /// ส่งไอเทมจากช่องกระเป๋าที่ระบุขึ้นไปวางบนโต๊ะหมู่บูชาหน้าศาลเจ้า (หากหมวดหมู่ตรงกัน)
-    /// ถอดของออกจากกระเป๋า "ก่อน" แล้วค่อยวางบนแท่น เพราะแท่นอาจคืนของเก่าเข้ากระเป๋า
-    /// (ถ้าเต็มจะดันช่องซ้ายสุดออก ทำให้ index เดิมเลื่อน) หากวางไม่สำเร็จจะใส่คืนที่ช่องเดิม
-    /// FIX บัก 7: ส่งอายุที่เหลือของชิ้นนี้ไปกับการวาง และใส่คืนพร้อมอายุเดิมถ้าวางไม่สำเร็จ
+    /// ส่งไอเทมจากช่องกระเป๋าที่ระบุขึ้นไปวางบนโต๊ะหมู่บูชาหน้าศาลเจ้า
+    /// ถอดออกจากกระเป๋าก่อนวาง และใส่คืนช่องเดิมพร้อมอายุเดิมหากวางไม่สำเร็จ
     /// </summary>
     public bool TryEquipSlotToAltar(int slotIndex)
     {
-        OfferingItemData item = GetItemAt(slotIndex);
-        if (item == null || AltarManager.Instance == null) return false;
+        OfferingInstance inst = GetInstanceAt(slotIndex);
+        if (!inst.IsValid || AltarManager.Instance == null) return false;
 
-        int remaining = GetRemainingAt(slotIndex);
+        entries.RemoveAt(slotIndex);
 
-        items.RemoveAt(slotIndex);
-        remainingRounds.RemoveAt(slotIndex);
-
-        bool placed = AltarManager.Instance.EquipOffering(item, remaining);
+        bool placed = AltarManager.Instance.EquipOffering(inst.data, inst.remainingDecayLoops);
         if (!placed)
         {
-            EnsureRemainingSynced();
-            int at = Mathf.Clamp(slotIndex, 0, items.Count);
-            items.Insert(at, item);
-            remainingRounds.Insert(at, remaining);
+            int at = Mathf.Clamp(slotIndex, 0, entries.Count);
+            entries.Insert(at, inst);
         }
 
         OnInventoryChanged?.Invoke();

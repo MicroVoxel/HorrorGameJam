@@ -4,16 +4,15 @@ using UnityEngine;
 using TMPro;
 
 /// <summary>
-/// ติดตามศาลเจ้าเป้าหมายบนกระดาน: นับจำนวนที่วางในช่วง Dawn, หาศาลที่ใกล้ที่สุด,
-/// และตัดสินชัยชนะหลังขั้น Cleanup ของเทิร์น (TurnManager.OnTurnCleanup) ตาม GDD 2.3 และ 4.2
-/// ข้อความ HUD อ่านจาก UITextProvider.Text
+/// ติดตามศาลเจ้าเป้าหมายบนกระดาน และเป็นจุดเดียวที่ตัดสินชัยชนะ (Victory) หลังขั้น Cleanup ของเทิร์น
+/// อ่านจำนวนศาลเจ้าที่ต้องวางจาก GameStateManager.Instance.Rules.RequiredShrines โดยตรง
 /// </summary>
 [DisallowMultipleComponent]
 public class ObjectiveTracker : SingletonBehaviour<ObjectiveTracker>
 {
     [Header("Setup Phase Requirements")]
-    [Tooltip("จำนวนการ์ดศาลเจ้าที่บังคับให้ผู้เล่นต้องวางลงบนกระดานก่อนเริ่มคืนแรก")]
-    [SerializeField] private int requiredShrinesToPlace = 2;
+    [Tooltip("ค่าสำรองกรณีไม่มี GameStateManager ในฉาก")]
+    [SerializeField, Min(1)] private int fallbackRequiredShrines = 2;
     [Tooltip("จำนวนศาลเจ้าที่ถูกวางสะสมตลอดด่าน (ไม่ลดลงเมื่อศาลพัง)")]
     [SerializeField] private int totalShrinesPlaced = 0;
 
@@ -27,9 +26,11 @@ public class ObjectiveTracker : SingletonBehaviour<ObjectiveTracker>
 
     public IReadOnlyList<TowerObjective> ActiveTargets => activeTargets;
     public int TargetCount => activeTargets.Count;
-    public int RequiredShrinesToPlace => requiredShrinesToPlace;
+    public int RequiredShrinesToPlace => GameStateManager.Instance != null
+        ? GameStateManager.Instance.Rules.RequiredShrines
+        : Mathf.Max(1, fallbackRequiredShrines);
     public int TotalShrinesPlaced => totalShrinesPlaced;
-    public bool IsSetupComplete => totalShrinesPlaced >= requiredShrinesToPlace;
+    public bool IsSetupComplete => totalShrinesPlaced >= RequiredShrinesToPlace;
 
     /// <summary>
     /// เรียกเมื่อผู้เล่นวางศาลเจ้าลงบนกระดาน (พารามิเตอร์: วางแล้วกี่หลัง, ต้องวางกี่หลัง)
@@ -65,12 +66,6 @@ public class ObjectiveTracker : SingletonBehaviour<ObjectiveTracker>
         subscribedToTurns = true;
     }
 
-    public void SetRequiredShrinesCount(int count)
-    {
-        requiredShrinesToPlace = Mathf.Max(1, count);
-        UpdateHUD();
-    }
-
     public void RegisterTarget(TowerObjective target)
     {
         if (target == null || activeTargets.Contains(target)) return;
@@ -80,9 +75,10 @@ public class ObjectiveTracker : SingletonBehaviour<ObjectiveTracker>
         activeTargets.Add(target);
         totalShrinesPlaced++;
 
-        Debug.Log($"<color=cyan>[ObjectiveTracker]</color> Shrines placed ({totalShrinesPlaced}/{requiredShrinesToPlace}) — Active: {activeTargets.Count}");
+        int required = RequiredShrinesToPlace;
+        Debug.Log($"<color=cyan>[ObjectiveTracker]</color> Shrines placed ({totalShrinesPlaced}/{required}) — Active: {activeTargets.Count}");
 
-        OnSetupProgressChanged?.Invoke(totalShrinesPlaced, requiredShrinesToPlace);
+        OnSetupProgressChanged?.Invoke(totalShrinesPlaced, required);
         UpdateHUD();
     }
 
@@ -132,45 +128,19 @@ public class ObjectiveTracker : SingletonBehaviour<ObjectiveTracker>
         OnAllTargetsDestroyedVictory?.Invoke();
     }
 
-    /// <summary>
-    /// ค้นหาศาลเจ้าเป้าหมายที่อยู่ใกล้ตำแหน่งของยูนิตผีมากที่สุด
-    /// </summary>
-    public TowerObjective GetClosestTarget(Vector3 fromPosition)
-    {
-        TowerObjective closest = null;
-        float minSqrDist = float.MaxValue;
-
-        for (int i = activeTargets.Count - 1; i >= 0; i--)
-        {
-            TowerObjective candidate = activeTargets[i];
-            if (candidate == null || !candidate.IsAlive)
-            {
-                continue;
-            }
-
-            float sqrDist = (candidate.transform.position - fromPosition).sqrMagnitude;
-            if (sqrDist < minSqrDist)
-            {
-                minSqrDist = sqrDist;
-                closest = candidate;
-            }
-        }
-
-        return closest;
-    }
-
     private void UpdateHUD()
     {
         if (objectiveCountText == null) return;
 
         UITextData t = UITextProvider.Text;
+        int required = RequiredShrinesToPlace;
         if (!IsSetupComplete)
         {
-            objectiveCountText.text = UITextData.Format(t.objectiveSetup, "placed", totalShrinesPlaced, "required", requiredShrinesToPlace);
+            objectiveCountText.text = UITextData.Format(t.objectiveSetup, "placed", totalShrinesPlaced, "required", required);
         }
         else
         {
-            objectiveCountText.text = UITextData.Format(t.objectiveRemaining, "current", activeTargets.Count, "total", requiredShrinesToPlace);
+            objectiveCountText.text = UITextData.Format(t.objectiveRemaining, "current", activeTargets.Count, "total", required);
         }
     }
 }

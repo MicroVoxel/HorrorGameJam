@@ -40,8 +40,6 @@ public class OfferingItemData : ScriptableObject
     [Tooltip("Savory (Fresh): ลดความเสียหายที่ศาลเจ้าได้รับตามสัดส่วน (0.5 = ดาเมจ x0.5 คิดก่อนหัก DEF)")]
     [Range(0f, 0.8f)]
     [SerializeField] private float freshShrineDamageReductionPercent = 0.0f;
-    [Tooltip("โบนัสเกราะป้องกันของศาลเจ้าขณะของยังสด")]
-    [SerializeField] private float freshShrineDefenseBonus = 0.0f;
 
     [Tooltip("Sweet (Fresh): จำนวนช่องที่ผลักผีหัวขบวนถอยหลัง (0 = ไม่ผลัก)")]
     [SerializeField, Min(0)] private int freshPushLeadSpiritTiles = 0;
@@ -54,8 +52,6 @@ public class OfferingItemData : ScriptableObject
     [Tooltip("Utility (Fresh): Pattern ป้อมยิงข้ามหน่วยได้ (ปิด blockedByUnits)")]
     [SerializeField] private bool freshTowerIgnoreBlocking = false;
 
-    [Tooltip("ตัวคูณความถี่ในการยิงของป้อม (1.0 = ปกติ, ค่ายิ่งน้อยยิ่งยิงถี่)")]
-    [SerializeField] private float freshTowerAttackSpeedMultiplier = 1.0f;
     [Tooltip("เสกป้อมโคมไฟหินออกมาป้องกันศาลเจ้าทันทีเมื่อวางของสดหรือไม่")]
     [SerializeField] private bool spawnRetaliationLanternOnFresh = false;
 
@@ -82,13 +78,6 @@ public class OfferingItemData : ScriptableObject
     [SerializeField] private bool rottenTowersSkipRound = false;
     [SerializeField, Min(1)] private int rottenTowersSkipDurationRounds = 1;
 
-    [Tooltip("ตัวคูณพลังโจมตีของผีทุกตัวเมื่อของชิ้นนี้เน่าเสีย")]
-    [SerializeField] private float rottenEntityAttackMultiplier = 1.0f;
-    [Tooltip("ตัวคูณความเร็วของผีทุกตัวเมื่อของชิ้นนี้เน่าเสีย")]
-    [SerializeField] private float rottenEntitySpeedMultiplier = 1.0f;
-    [Tooltip("ปลุกผีทุกตัวในขบวนให้เข้าสู่สถานะคลั่ง (Frenzy: +1 AP, โจมตี 2 ครั้ง) หรือไม่")]
-    [SerializeField] private bool triggersFrenzy = false;
-
     // ---------- General Properties ----------
     public string ItemId => itemId;
     public string ItemName => itemName;
@@ -102,13 +91,11 @@ public class OfferingItemData : ScriptableObject
     // ---------- Fresh Properties ----------
     public bool FreshGrantTowerDoubleStrike => freshGrantTowerDoubleStrike;
     public AbilityData FreshTowerAbility => freshTowerAbility;
-    public float FreshShrineDefenseBonus => freshShrineDefenseBonus;
     public float FreshShrineDamageReductionPercent => freshShrineDamageReductionPercent;
     public int FreshPushLeadSpiritTiles => freshPushLeadSpiritTiles;
     public int FreshPushEveryNTurns => Mathf.Max(1, freshPushEveryNTurns);
     public float FreshEntityAttackMultiplier => freshEntityAttackMultiplier;
     public bool FreshTowerIgnoreBlocking => freshTowerIgnoreBlocking;
-    public float FreshTowerAttackSpeedMultiplier => freshTowerAttackSpeedMultiplier;
     public bool SpawnRetaliationLanternOnFresh => spawnRetaliationLanternOnFresh;
 
     // ---------- Rotten Properties ----------
@@ -121,9 +108,6 @@ public class OfferingItemData : ScriptableObject
     public int RottenTowerPatternSizeDelta => rottenTowerPatternSizeDelta;
     public bool RottenTowersSkipRound => rottenTowersSkipRound;
     public int RottenTowersSkipDurationRounds => Mathf.Max(1, rottenTowersSkipDurationRounds);
-    public float RottenEntityAttackMultiplier => rottenEntityAttackMultiplier;
-    public float RottenEntitySpeedMultiplier => rottenEntitySpeedMultiplier;
-    public bool TriggersFrenzy => triggersFrenzy;
 
     private void OnEnable()
     {
@@ -140,22 +124,15 @@ public class OfferingItemData : ScriptableObject
     }
 #endif
 
-    /// <summary>
-    /// อัปเกรด Asset เดิมจาก v1 ให้ตรงตามตาราง 4.6 ของ GDD v2 โดยอัตโนมัติในครั้งแรก
-    /// หลังจาก schemaVersion = 2 แล้ว นักออกแบบสามารถปรับค่าใน Inspector ได้อิสระ
-    /// </summary>
     [ContextMenu("Apply Table 4.6 Defaults For Category")]
     public void ApplyTable46DefaultsForCategory()
     {
-        // รีเซ็ตค่าทั้งหมดเป็นค่ากลางก่อนตั้งค่าตามหมวด
         freshGrantTowerDoubleStrike = false;
-        freshShrineDefenseBonus = 0f;
         freshShrineDamageReductionPercent = 0f;
         freshPushLeadSpiritTiles = 0;
         freshPushEveryNTurns = 2;
         freshEntityAttackMultiplier = 1f;
         freshTowerIgnoreBlocking = false;
-        freshTowerAttackSpeedMultiplier = 1f;
 
         rottenGrantEntityLifedrain = false;
         rottenEntityMoveBonus = 0;
@@ -165,9 +142,6 @@ public class OfferingItemData : ScriptableObject
         rottenTowerPatternSizeDelta = 0;
         rottenTowersSkipRound = false;
         rottenTowersSkipDurationRounds = 1;
-        rottenEntityAttackMultiplier = 1f;
-        rottenEntitySpeedMultiplier = 1f;
-        triggersFrenzy = false;
 
         switch (offeringType)
         {

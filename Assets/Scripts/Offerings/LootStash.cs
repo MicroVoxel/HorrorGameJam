@@ -4,13 +4,7 @@ using UnityEngine;
 
 /// <summary>
 /// คลังพักของดรอปประจำ Round (GDD 4.2, 4.3, 4.8):
-/// - ระหว่าง Resolution: ของถวายและการ์ดที่ดรอปจะถูกเก็บสะสมไว้ใน LootStash ก่อน
-/// - เมื่อเข้าสู่ RoundEnd:
-///   1. คิดโบนัสจาก Threat Tower ที่ผู้เล่นวางและยังตั้งอยู่บนกระดาน:
-///      - สุ่มของถวายเพิ่ม threatLootBonusPerTower ครั้งต่อป้อม
-///      - เพิ่มโอกาสดรอปการ์ด threatCardChanceBonus ต่อป้อม (เพดานสูงสุด threatCardChanceCap)
-///   2. แจกของถวายและการ์ดทั้งหมดเข้า InventorySlotManager และ CardDeckController พร้อมกัน
-///   3. เก็บรายการดรอปของ Round ล่าสุดไว้ให้ RoundSummaryUI แสดงผล
+/// รวมฟังก์ชันทอยดรอปกลาง (TryRollOfferingDrop / TryRollCardDrop / TryRollDrops) ให้ EntityDroppable และ TowerDroppable ใช้ร่วมกัน
 /// </summary>
 [DisallowMultipleComponent]
 public class LootStash : SingletonBehaviour<LootStash>
@@ -18,8 +12,6 @@ public class LootStash : SingletonBehaviour<LootStash>
     [Header("Threat Tower Bonus Pools (เว้นว่างได้ ระบบจะรวบรวมจาก Droppable ในฉากอัตโนมัติ)")]
     [SerializeField] private List<OfferingItemData> bonusOfferingPool = new List<OfferingItemData>();
     [SerializeField] private List<CardData> bonusCardPool = new List<CardData>();
-    [Tooltip("โอกาสสำเร็จต่อ 1 Loot Roll โบนัสของ Threat Tower ตอน RoundEnd")]
-    [SerializeField, Range(0f, 1f)] private float threatOfferingRollChance = 0.65f;
 
     private readonly List<OfferingItemData> pendingOfferings = new List<OfferingItemData>(16);
     private readonly List<CardData> pendingCards = new List<CardData>(16);
@@ -29,22 +21,13 @@ public class LootStash : SingletonBehaviour<LootStash>
 
     private bool subscribed;
 
-    /// <summary>ของถวายที่รอแจกใน Resolution รอบปัจจุบัน</summary>
     public IReadOnlyList<OfferingItemData> PendingOfferings => pendingOfferings;
-
-    /// <summary>การ์ดที่รอแจกใน Resolution รอบปัจจุบัน</summary>
     public IReadOnlyList<CardData> PendingCards => pendingCards;
-
-    /// <summary>ของถวายทั้งหมดที่ได้รับใน Round ล่าสุด (ใช้แสดงใน Round Summary)</summary>
     public IReadOnlyList<OfferingItemData> LastRoundOfferings => lastRoundOfferings;
-
-    /// <summary>การ์ดทั้งหมดที่ได้รับใน Round ล่าสุด (ใช้แสดงใน Round Summary)</summary>
     public IReadOnlyList<CardData> LastRoundCards => lastRoundCards;
 
-    /// <summary>ยิงเมื่อแจกของดรอปทั้งหมดตอนเข้า RoundEnd เสร็จสิ้น</summary>
     public event Action<IReadOnlyList<OfferingItemData>, IReadOnlyList<CardData>> OnRoundLootGranted;
 
-    /// <summary>คืน Instance ที่มีอยู่ หรือสร้างติดไว้กับ GameStateManager อัตโนมัติหากยังไม่ได้วางในซีน</summary>
     public static LootStash EnsureInstance()
     {
         if (Instance != null) return Instance;
@@ -99,9 +82,50 @@ public class LootStash : SingletonBehaviour<LootStash>
         }
     }
 
+    // ---------- Shared Drop Roll Helpers ----------
+
+    /// <summary>ทอยดรอปของถวายจากตารางที่ส่งเข้ามาด้วย GameRandom แล้วเก็บเข้า LootStash</summary>
+    public static void TryRollOfferingDrop(IList<OfferingItemData> pool, float chance, string sourceTag)
+    {
+        if (pool == null || pool.Count == 0 || chance <= 0f) return;
+        if (!GameRandom.Chance(chance)) return;
+
+        OfferingItemData chosen = GameRandom.Pick(pool);
+        if (chosen != null)
+        {
+            StashOffering(chosen, sourceTag);
+        }
+    }
+
+    /// <summary>ทอยดรอปการ์ด (รวมโบนัสจาก Threat Tower อัตโนมัติ) ด้วย GameRandom แล้วเก็บเข้า LootStash</summary>
+    public static void TryRollCardDrop(IList<CardData> pool, float baseChance, string sourceTag)
+    {
+        if (pool == null || pool.Count == 0 || baseChance <= 0f) return;
+
+        float effectiveChance = Mathf.Clamp01(baseChance + GetThreatCardChanceBonus());
+        if (!GameRandom.Chance(effectiveChance)) return;
+
+        CardData chosen = GameRandom.Pick(pool);
+        if (chosen != null)
+        {
+            StashCard(chosen, sourceTag);
+        }
+    }
+
+    /// <summary>ทอยทั้งของถวายและการ์ดในคำสั่งเดียว</summary>
+    public static void TryRollDrops(
+        IList<OfferingItemData> offeringPool,
+        float offeringChance,
+        IList<CardData> cardPool,
+        float cardBaseChance,
+        string sourceTag)
+    {
+        TryRollOfferingDrop(offeringPool, offeringChance, sourceTag);
+        TryRollCardDrop(cardPool, cardBaseChance, sourceTag);
+    }
+
     // ---------- Pool Registration ----------
 
-    /// <summary>ลงทะเบียนรายการของดรอปจาก EntityDroppable / TowerDroppable เพื่อใช้เป็น Pool สุ่มโบนัส Threat Tower</summary>
     public static void RegisterPools(IReadOnlyList<OfferingItemData> offerings, IReadOnlyList<CardData> cards)
     {
         LootStash stash = EnsureInstance();
@@ -210,7 +234,6 @@ public class LootStash : SingletonBehaviour<LootStash>
 
     // ---------- Threat Tower Bonus & RoundEnd Flush ----------
 
-    /// <summary>นับจำนวนป้อมโจมตีที่ผู้เล่นวางเอง (Threat Tower) และยังตั้งอยู่บนกระดาน</summary>
     public static int CountSurvivingThreatTowers()
     {
         int count = 0;
@@ -226,7 +249,6 @@ public class LootStash : SingletonBehaviour<LootStash>
         return count;
     }
 
-    /// <summary>โอกาสดรอปการ์ดโบนัสรวมจากจำนวน Threat Tower ที่รอดอยู่ (สูงสุดไม่เกิน threatCardChanceCap)</summary>
     public static float GetThreatCardChanceBonus()
     {
         if (GameStateManager.Instance == null) return 0f;
@@ -238,7 +260,6 @@ public class LootStash : SingletonBehaviour<LootStash>
         return Mathf.Min(rules.ThreatCardChanceCap, threatCount * rules.ThreatCardChanceBonus);
     }
 
-    /// <summary>ทอยโบนัสจาก Threat Tower และแจกของในคลังทั้งหมดเข้ากระเป๋าและมือผู้เล่นตอนเข้า RoundEnd</summary>
     public void FlushRoundEndLoot()
     {
         RollThreatTowerBonuses();
@@ -282,12 +303,13 @@ public class LootStash : SingletonBehaviour<LootStash>
 
         GameRulesData rules = GameStateManager.Instance.Rules;
         int bonusRolls = threatCount * Mathf.Max(0, rules.ThreatLootBonusPerTower);
+        float offeringRollChance = rules.ThreatOfferingRollChance;
 
         if (bonusRolls > 0 && bonusOfferingPool.Count > 0)
         {
             for (int r = 0; r < bonusRolls; r++)
             {
-                if (GameRandom.Chance(threatOfferingRollChance))
+                if (GameRandom.Chance(offeringRollChance))
                 {
                     OfferingItemData bonusItem = GameRandom.Pick(bonusOfferingPool);
                     if (bonusItem != null)

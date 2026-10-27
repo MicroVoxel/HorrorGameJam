@@ -5,9 +5,7 @@ using TMPro;
 
 /// <summary>
 /// หน้าต่างสรุปผลเมื่อเข้าสู่เฟส RoundEnd (GDD 6.4):
-/// แสดงดาเมจที่ศาลเจ้าได้รับ/จำนวนศาลที่เหลือ, จำนวนผีตาย/กลายพันธุ์ในรอบนี้,
-/// ของดรอปที่ได้รับจาก LootStash, ของถวายที่เพิ่งบูดเน่า และก้านธูปคงเหลือ พร้อมปุ่ม Continue
-/// แสดงหลัง GameStateManager.OnRoundEndProcessed เพื่อให้ตัวเลขของเน่าและ loot ครบแล้วเสมอ
+/// หากผูก continueButton ไว้ในหน้าต่างนี้ SidePanelController จะซ่อนปุ่มหลักในเฟส RoundEnd อัตโนมัติ (มีปุ่ม Continue ปุ่มเดียวเสมอ)
 /// </summary>
 [DisallowMultipleComponent]
 public class RoundSummaryUI : SingletonBehaviour<RoundSummaryUI>
@@ -30,6 +28,9 @@ public class RoundSummaryUI : SingletonBehaviour<RoundSummaryUI>
     private readonly HashSet<EntityBase> trackedEntities = new HashSet<EntityBase>();
     private readonly HashSet<EntityMutatable> trackedMutatables = new HashSet<EntityMutatable>();
 
+    /// <summary>หน้าต่างสรุปนี้มีปุ่ม Continue ของตัวเองหรือไม่ (ให้ SidePanelController เช็กเพื่อไม่แสดงปุ่มซ้ำ)</summary>
+    public bool HasContinueButton => summaryPanel != null && continueButton != null;
+
     protected override void OnSingletonAwake()
     {
         if (summaryPanel != null) summaryPanel.SetActive(false);
@@ -45,7 +46,7 @@ public class RoundSummaryUI : SingletonBehaviour<RoundSummaryUI>
         if (GameStateManager.Instance != null)
         {
             GameStateManager.Instance.OnStateChanged += HandleStateChanged;
-            GameStateManager.Instance.OnRoundEndProcessed += HandleRoundEndProcessed; // FIX บัก 6
+            GameStateManager.Instance.OnRoundEndProcessed += HandleRoundEndProcessed;
         }
 
         if (AltarManager.Instance != null)
@@ -53,7 +54,6 @@ public class RoundSummaryUI : SingletonBehaviour<RoundSummaryUI>
             AltarManager.Instance.OnOfferingRotten += HandleOfferingRotten;
         }
 
-        // FIX บัก 5: ฟังผีที่เกิดใหม่แทนการโพลล์ใน Update (ผีที่เกิดและตายในเฟรมเดียวกัน เช่น ตอน Skip จะไม่หลุด)
         EntityRegistry.OnEntityRegistered += HandleEntityRegistered;
     }
 
@@ -90,12 +90,10 @@ public class RoundSummaryUI : SingletonBehaviour<RoundSummaryUI>
         }
         else if (state != GameState.RoundEnd && summaryPanel != null)
         {
-            // RoundEnd: ยังไม่แสดงที่นี่ รอ HandleRoundEndProcessed (หลังทุกระบบประมวลผลจบ)
             summaryPanel.SetActive(false);
         }
     }
 
-    // FIX บัก 6: ยิงหลัง handler ทุกตัวของ OnStateChanged(RoundEnd) ทำงานจบ (ของเน่า, แจก loot)
     private void HandleRoundEndProcessed()
     {
         PopulateAndShowSummary();
@@ -108,7 +106,6 @@ public class RoundSummaryUI : SingletonBehaviour<RoundSummaryUI>
         spiritsMutatedThisRound = 0;
         offeringsRottedThisRound = 0;
 
-        // ผีที่มีอยู่แล้วตอนเริ่ม Resolution
         IReadOnlyList<EntityBase> entities = EntityRegistry.ActiveEntities;
         for (int i = 0; i < entities.Count; i++)
         {
@@ -165,7 +162,6 @@ public class RoundSummaryUI : SingletonBehaviour<RoundSummaryUI>
 
     private void PopulateAndShowSummary()
     {
-        // เกมอาจจบ (Ended) ระหว่างที่ handler อื่นประมวลผล RoundEnd
         if (!GameStateManager.IsRoundEnd) return;
 
         UnsubscribeAllEntities();
@@ -233,10 +229,15 @@ public class RoundSummaryUI : SingletonBehaviour<RoundSummaryUI>
         }
     }
 
+    public void HideSummary()
+    {
+        if (summaryPanel != null) summaryPanel.SetActive(false);
+    }
+
     private void HandleContinueClicked()
     {
         AudioManager.Click();
-        if (summaryPanel != null) summaryPanel.SetActive(false);
+        HideSummary();
 
         if (GameStateManager.Instance != null)
         {

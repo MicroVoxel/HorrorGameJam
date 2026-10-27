@@ -4,10 +4,9 @@ using TMPro;
 
 /// <summary>
 /// แผงแสดงคำอธิบายคงที่ด้านขวาล่างของจอ (GDD 6.2 & 6.5)
-/// - ตอนว่างแสดง tooltipEmptyTip จาก UITextData
+/// - ตอนว่างแสดงหัวข้อคงที่ tooltipEmptyTitle ("Ritual Guide") และ tooltipEmptyTip (ไม่ดึงชื่อเฟสมาแสดงซ้ำกับ TurnTrackerUI)
 /// - ตอนชี้แสดง Title, Subtitle, Summary และชิป Keyword
 /// - เมื่อกด Shift ค้าง จะขยายแสดง Detail และคำอธิบายของแต่ละ Keyword
-/// - รองรับการล็อกข้อมูลขณะผู้เล่นกำลังลากไอเทมหรือลากสลับผี
 /// </summary>
 [DisallowMultipleComponent]
 public class TooltipPanel : SingletonBehaviour<TooltipPanel>
@@ -98,7 +97,7 @@ public class TooltipPanel : SingletonBehaviour<TooltipPanel>
         currentOwner = null;
 
         UITextData t = UITextProvider.Text;
-        if (titleText != null) titleText.text = t.GetPhaseLabel(GameStateManager.Current);
+        if (titleText != null) titleText.text = t.tooltipEmptyTitle;
         if (subtitleText != null) subtitleText.text = string.Empty;
         if (bodyText != null) bodyText.text = t.tooltipEmptyTip;
         if (keywordsText != null) keywordsText.text = string.Empty;

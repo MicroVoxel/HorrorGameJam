@@ -3,21 +3,20 @@ using UnityEngine;
 
 public enum HitMode
 {
-    Single,         // โดนเป้าหมายเดียวที่เลือก
-    AllInRange,     // โดนทุกช่องใน Range Pattern
-    AreaAtTarget,   // วาง Area Pattern ที่ช่องเป้าหมาย
-    Pierce          // เส้นตรงจากผู้โจมตีผ่านเป้า
+    Single,
+    AllInRange,
+    AreaAtTarget,
+    Pierce
 }
 
 public enum AreaOrientation
 {
-    AttackerFacing,     // ทิศ Area ตามทิศหน้าผู้โจมตี
-    AttackerToTarget    // ทิศ Area ตามทิศจากผู้โจมตีไปหาเป้า
+    AttackerFacing,
+    AttackerToTarget
 }
 
 /// <summary>
 /// รูปแบบการโจมตี = Range Pattern (ช่องที่เลือกเป้าหมายได้) + Hit Pattern (ช่องที่โดนดาเมจจริง)
-/// ลากใส่ Prefab ของผี/ป้อม ผู้เรียก (Part 4) ส่งตำแหน่ง ทิศหน้า และ HexPatternContext เข้ามา
 /// </summary>
 [CreateAssetMenu(fileName = "NewAttackPattern", menuName = "GameJam/Attack Pattern Data")]
 public class AttackPatternData : ScriptableObject
@@ -48,7 +47,6 @@ public class AttackPatternData : ScriptableObject
     public float FalloffPercent => falloffPercent;
     public bool FriendlyFire => friendlyFire;
 
-    /// <summary>ช่องที่เลือกเป้าหมายได้ (Range Pattern)</summary>
     public void CollectRangeTiles(HexCoordinates attacker, int facing, List<HexCoordinates> results, in HexPatternContext ctx)
     {
         if (results == null) return;
@@ -62,11 +60,6 @@ public class AttackPatternData : ScriptableObject
         rangePattern.CollectTiles(attacker, facing, results, ctx);
     }
 
-    /// <summary>
-    /// ช่องที่โดนจริงเมื่อเลือก target ผลเรียงจากใกล้ผู้โจมตีไปไกล (เสมอกันเรียงตาม q แล้ว r)
-    /// เพื่อให้ลำดับการตายก่อนหลังคงที่ (Deterministic) ช่อง target ถูกรวมเสมอ
-    /// rangeTiles ใส่ผลของ CollectRangeTiles ที่คำนวณไว้แล้วเพื่อประหยัดงาน (ไม่ใส่ = คำนวณเอง)
-    /// </summary>
     public void CollectHitTiles(
         HexCoordinates attacker,
         int facing,
@@ -109,19 +102,9 @@ public class AttackPatternData : ScriptableObject
 
         if (!results.Contains(target)) results.Add(target);
 
-        results.Sort((a, b) =>
-        {
-            int da = attacker.DistanceTo(a);
-            int db = attacker.DistanceTo(b);
-            if (da != db) return da.CompareTo(db);
-            if (a.Q != b.Q) return a.Q.CompareTo(b.Q);
-            return a.R.CompareTo(b.R);
-        });
+        HexCoordinates.SortByDistanceFrom(results, attacker);
     }
 
-    /// <summary>
-    /// ตัวคูณดาเมจของช่อง cell เมื่อศูนย์กลางการโจมตีคือ target (1 = เต็ม) ใช้กับ Area At Target และ Pierce เท่านั้น
-    /// </summary>
     public float GetDamageMultiplier(HexCoordinates target, HexCoordinates cell)
     {
         if (falloffPercent <= 0f) return 1f;

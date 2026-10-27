@@ -5,13 +5,10 @@ using UnityEngine;
 /// <summary>
 /// คลาสฐานของสิ่งก่อสร้างทุกชนิดบนกระดาน Hex (ศาลเจ้า, ป้อมโคมไฟ, รังผี)
 /// จัดการ HP, DEF, กฎการวาง, ทิศหน้า (Facing 0-5) และรับผลจากโต๊ะบูชาผ่าน SetAltarModifiers
-/// สูตรดาเมจ: max(1, floor(raw x (1 - ลดดาเมจ)) - DEF) ; ignoreDefense (Armor Piercing) ข้ามทั้งสองส่วน
-/// 4B: Barrier / Tough N / Heal (Lifedrain, Regeneration) / PlayerPlaced (นับเป็น Threat Tower) / LastCoordinates
 /// </summary>
 [DisallowMultipleComponent]
 public class TowerBase : MonoBehaviour, IDamageable
 {
-    // ทะเบียนสิ่งก่อสร้างที่ "วางลงบนกระดานจริงแล้ว" (ไม่รวม Ghost Preview)
     private static readonly List<TowerBase> activeTowers = new List<TowerBase>(32);
     private static int placementCounter;
     public static IReadOnlyList<TowerBase> ActiveTowers => activeTowers;
@@ -71,17 +68,9 @@ public class TowerBase : MonoBehaviour, IDamageable
 
     public int Facing => facing;
     public AbilityHolder Abilities => abilities;
-
-    /// <summary>ลำดับการวาง (เลขน้อย = วางก่อน) ใช้เป็น SortKey ของป้อมและรังผีใน TurnManager</summary>
     public int PlacementOrder { get; private set; }
-
-    /// <summary>true = ฝั่งศาล (ศาล ป้อม) ผีโจมตีได้ / false = ฝั่งผี (รังผี) ป้อมและผีไม่โจมตี</summary>
     public bool IsShrineSide => isShrineSide;
-
-    /// <summary>ผู้เล่นวางเองจากการ์ด (ป้อมโจมตีที่ผู้เล่นวางนับเป็น Threat Tower) ป้อมที่ศาลเสกเองเป็น false</summary>
     public bool IsPlayerPlaced { get; private set; }
-
-    /// <summary>พิกัดช่องที่เคยวางอยู่ (ยังอ่านได้หลังถูกทำลาย ใช้กับ Last Breath)</summary>
     public HexCoordinates LastCoordinates { get; private set; }
 
     public event Action<TowerBase> OnPlacedOnBoard;
@@ -105,13 +94,11 @@ public class TowerBase : MonoBehaviour, IDamageable
         activeTowers.Remove(this);
     }
 
-    /// <summary>เรียกก่อน PlaceTower เมื่อผู้เล่นเป็นคนวาง (นับเป็น Threat Tower ถ้าเป็นป้อมโจมตี)</summary>
     public void MarkPlayerPlaced()
     {
         IsPlayerPlaced = true;
     }
 
-    /// <summary>ตั้งทิศหน้า (ใช้ตอนวาง: Ghost หมุนด้วย Q / E แล้วส่งค่ามาที่นี่ก่อน PlaceTower)</summary>
     public void SetFacing(int newFacing)
     {
         facing = HexCoordinates.NormalizeFacing(newFacing);
@@ -131,32 +118,11 @@ public class TowerBase : MonoBehaviour, IDamageable
     }
 
     /// <summary>
-    /// ตรวจสอบความถูกต้องของช่อง Hex ทั้งประเภทพื้นผิว, กฎติดทางเดิน และกฎห้ามวางศาลเจ้าติดกัน
-    /// (เหตุผลละเอียดและ Valid Threat Check อยู่ที่ ThreatPlacementValidator)
+    /// ตรวจสอบความถูกต้องของช่อง Hex ผ่าน ThreatPlacementValidator.CheckTileRules (ชุดกฎเดียวกับตอนคลิกวาง)
     /// </summary>
     public bool CanPlaceOnTile(HexTile tile, LoopPathManager pathManager)
     {
-        if (tile == null || tile.HasTower) return false;
-        if (!CanPlaceOn(tile.GroundType)) return false;
-
-        if (pathManager != null)
-        {
-            if (requireAdjacentPath && !pathManager.IsAdjacentToPath(tile.Coordinates))
-            {
-                return false;
-            }
-
-            TowerObjective defenseComp = GetComponent<TowerObjective>();
-            if (defenseComp != null && defenseComp.PreventAdjacentDefenseBases)
-            {
-                if (pathManager.HasAdjacentDefenseBase(tile.Coordinates))
-                {
-                    return false;
-                }
-            }
-        }
-
-        return true;
+        return ThreatPlacementValidator.CheckTileRules(this, tile, pathManager) == PlacementDenyReason.None;
     }
 
     public virtual void OnPlaced(HexTile tile)
@@ -176,7 +142,6 @@ public class TowerBase : MonoBehaviour, IDamageable
             activeTowers.Add(this);
         }
 
-        // สิ่งก่อสร้างที่วางทีหลัง (เช่น ป้อมที่ถูกเสก) ต้องได้รับบัฟ/คำสาปที่โต๊ะบูชามีอยู่ในตอนนี้ทันที
         if (AltarManager.Instance != null)
         {
             AltarManager.Instance.ApplyEffectsToTower(this);
@@ -191,9 +156,6 @@ public class TowerBase : MonoBehaviour, IDamageable
         CurrentTile = null;
     }
 
-    /// <summary>
-    /// รับผลจากโต๊ะบูชา: โบนัสเกราะ, สัดส่วนลดดาเมจ (0-0.8) และสถานะเกราะถูกกัดกร่อนจากของเน่า
-    /// </summary>
     public void SetAltarModifiers(float defenseBonus, float damageReduction, bool armorStripped)
     {
         altarDefenseBonus = Mathf.Max(0.0f, defenseBonus);
@@ -201,15 +163,11 @@ public class TowerBase : MonoBehaviour, IDamageable
         altarArmorStripped = armorStripped;
     }
 
-    /// <summary>
-    /// ทำดาเมจและคืนค่าที่เกิดขึ้นจริง ignoreDefense = true (Armor Piercing) ข้าม DEF และส่วนลดดาเมจ ขั้นต่ำ 1
-    /// </summary>
     public float ApplyDamage(float rawAmount, bool ignoreDefense = false)
     {
         return ApplyDamage(rawAmount, ignoreDefense, out _);
     }
 
-    /// <summary>เหมือนด้านบน แต่คืน overkill (ดาเมจที่เกินเลือดที่เหลือ) ให้ Overrun ส่งต่อ Barrier กันได้ 1 ครั้งต่อ Round</summary>
     public float ApplyDamage(float rawAmount, bool ignoreDefense, out float overkill)
     {
         overkill = 0f;
@@ -253,11 +211,6 @@ public class TowerBase : MonoBehaviour, IDamageable
 
         currentHealth = Mathf.Min(maxHealth, currentHealth + amount);
         OnHealthChanged?.Invoke(this, currentHealth);
-    }
-
-    public void ModifyDefense(float delta)
-    {
-        defense = Mathf.Max(0.0f, defense + delta);
     }
 
     private void DestroyTower()

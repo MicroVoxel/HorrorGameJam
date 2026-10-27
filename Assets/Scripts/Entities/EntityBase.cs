@@ -4,8 +4,6 @@ using UnityEngine;
 /// <summary>
 /// โครงสร้างฐานของยูนิตขบวนร้อยอสูร (Entity Base)
 /// v2: มี AP ต่อเทิร์น, Move Speed (ช่องต่อ 1 Move), ทิศหน้า (Facing 0-5) และสูตรดาเมจ
-///   Final = max(1, floor(Base x Multipliers) - DEF)  (Armor Piercing ข้าม DEF)
-/// 4B: Keyword (AbilityHolder) Barrier กันดาเมจครั้งแรกต่อ Round, Tough N เพิ่ม DEF, ส่งค่า Overkill ให้ Overrun
 /// </summary>
 [DisallowMultipleComponent]
 [SelectionBase]
@@ -36,7 +34,6 @@ public class EntityBase : MonoBehaviour, IDamageable
     [Header("Destruction Feedback")]
     [SerializeField] private GameObject deathVfxPrefab;
 
-    // runtime turn state
     private int apBonus;
     private int moveBonus;
     private int altarMoveBonus;
@@ -48,9 +45,8 @@ public class EntityBase : MonoBehaviour, IDamageable
     public float MaxHealth => maxHealth;
     public float CurrentHealth => currentHealth;
 
-    /// <summary>DEF จริง (รวม Tough N)</summary>
-    public float Defense => EffectiveDefense;
     public float BaseDefense => defense;
+    /// <summary>DEF จริง (รวม Tough N)</summary>
     public float EffectiveDefense => defense + (abilities != null && abilities.Has(AbilityKeyword.Tough) ? abilities.GetValue(AbilityKeyword.Tough) : 0);
 
     public bool IsDead => currentHealth <= 0.0f;
@@ -61,18 +57,13 @@ public class EntityBase : MonoBehaviour, IDamageable
     public bool IsFrenzied => isFrenzied;
     public HexTile OccupiedTile => occupiedTile;
     public AbilityHolder Abilities => abilities;
-
-    /// <summary>พิกัดช่องล่าสุดที่เคยยืน (ยังอ่านได้หลังตาย ใช้กับ Last Breath)</summary>
     public HexCoordinates LastCoordinates { get; private set; }
 
     // ---------- Turn stats ----------
-    /// <summary>AP สูงสุดต่อเทิร์น (Frenzy +1, Mutation อาจเพิ่ม)</summary>
     public int MaxActionPoints => baseActionPoints + apBonus + (isFrenzied ? 1 : 0);
     public int MoveSpeed => baseMoveSpeed + moveBonus + altarMoveBonus;
     public int CurrentActionPoints => currentAp;
     public int Facing => facing;
-
-    /// <summary>ผีตัวนี้ขยับไม่ได้เพราะช่องหน้าตัน (UI ใช้โชว์ไอคอน Blocked)</summary>
     public bool IsBlocked { get; private set; }
 
     public event Action<float, float> OnHealthChanged;
@@ -95,7 +86,6 @@ public class EntityBase : MonoBehaviour, IDamageable
         EntityRegistry.Unregister(this);
     }
 
-    /// <summary>รับผลของถวายทั้งหมดที่มีอยู่ตอนนี้ (ตัวคูณ, Move, Keyword ที่ได้มา) เรียกตอนเกิดและตอนโต๊ะบูชาเปลี่ยน</summary>
     public void SyncWithAltarManager()
     {
         if (AltarManager.Instance != null)
@@ -104,7 +94,6 @@ public class EntityBase : MonoBehaviour, IDamageable
         }
     }
 
-    /// <summary>โบนัส Move จากของถวาย (เช่น Berserk) แยกจากโบนัสกลายพันธุ์ เพื่อถอดออกได้เมื่อของหมดฤทธิ์</summary>
     public void SetAltarMoveBonus(int amount)
     {
         altarMoveBonus = Mathf.Max(0, amount);
@@ -119,7 +108,6 @@ public class EntityBase : MonoBehaviour, IDamageable
 
     // ---------- Turn API ----------
 
-    /// <summary>ต้นเทิร์น: รีเซ็ต AP และสถานะ Blocked</summary>
     public void BeginTurn()
     {
         currentAp = MaxActionPoints;
@@ -134,7 +122,6 @@ public class EntityBase : MonoBehaviour, IDamageable
         return true;
     }
 
-    /// <summary>ใช้ AP ที่เหลือทิ้งทั้งหมด (ขบวนตัน = เสีย AP เปล่า)</summary>
     public void DrainActionPoints(bool blocked)
     {
         currentAp = 0;
@@ -144,7 +131,6 @@ public class EntityBase : MonoBehaviour, IDamageable
     public void AddMoveBonus(int amount) => moveBonus = Mathf.Max(0, moveBonus + amount);
     public void AddActionPointBonus(int amount) => apBonus = Mathf.Max(0, apBonus + amount);
 
-    /// <summary>ตั้งทิศหน้า 0-5 (ตรงกับ HexCoordinates.Directions) และหมุนโมเดลตาม</summary>
     public void SetFacing(int newFacing, bool rotateVisual = true)
     {
         facing = HexCoordinates.NormalizeFacing(newFacing);
@@ -157,9 +143,6 @@ public class EntityBase : MonoBehaviour, IDamageable
 
     // ---------- Board occupancy ----------
 
-    /// <summary>
-    /// กำหนดช่องกระดานที่ยูนิตนี้กำลังยืนครองอยู่ตามกฎ 1 ช่อง = 1 ตัว
-    /// </summary>
     public void SetOccupiedTile(HexTile newTile)
     {
         if (occupiedTile != null && occupiedTile.CurrentEntity == this)
@@ -178,9 +161,6 @@ public class EntityBase : MonoBehaviour, IDamageable
 
     // ---------- Health ----------
 
-    /// <summary>
-    /// สเกลเพิ่ม Max HP และฟื้นฟูเลือดเต็มหลอดเมื่อกลายพันธุ์ (เรียกโดย EntityMutatable)
-    /// </summary>
     public void HealFullAndScaleMaxHealth(float multiplier)
     {
         if (IsDead) return;
@@ -202,19 +182,11 @@ public class EntityBase : MonoBehaviour, IDamageable
         OnHealthChanged?.Invoke(currentHealth, maxHealth);
     }
 
-    /// <summary>
-    /// ทำดาเมจตามสูตร max(1, floor(raw) - DEF) คืนดาเมจที่เกิดขึ้นจริง
-    /// ignoreDefense = true (Armor Piercing) ข้าม DEF แต่ยังได้ขั้นต่ำ 1
-    /// </summary>
     public float ApplyDamage(float rawAmount, bool ignoreDefense = false)
     {
         return ApplyDamage(rawAmount, ignoreDefense, out _);
     }
 
-    /// <summary>
-    /// เหมือนด้านบน แต่คืน overkill (ดาเมจที่เกินเลือดที่เหลือ) ให้ Keyword Overrun ส่งต่อ
-    /// Barrier กันได้ทั้งดาเมจ (คืน 0) 1 ครั้งต่อ Round
-    /// </summary>
     public float ApplyDamage(float rawAmount, bool ignoreDefense, out float overkill)
     {
         overkill = 0f;
@@ -259,7 +231,6 @@ public class EntityBase : MonoBehaviour, IDamageable
             occupiedTile = null;
         }
 
-        // FIX บัก 5: ถอดจาก Registry ทันที (Destroy มีผลท้ายเฟรม แต่ Skip รันทั้ง Round ในเฟรมเดียว)
         EntityRegistry.Unregister(this);
 
         OnEntityDied?.Invoke(this);

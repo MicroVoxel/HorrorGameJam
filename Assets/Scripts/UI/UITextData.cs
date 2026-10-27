@@ -3,8 +3,6 @@ using UnityEngine;
 
 /// <summary>
 /// ข้อความทั้งหมดที่ขึ้นบน UI (ค่าตั้งต้นเป็นภาษาอังกฤษ ห้ามใส่ emoji) แก้ได้ใน Inspector ทุกข้อความ
-/// ข้อความที่มีตัวแปรใช้ placeholder เช่น {current} แล้วเรียก UITextData.Format(template, "current", 3, "total", 5)
-/// ชื่อ/คำอธิบายของการ์ดและไอเทมยังอยู่ใน CardData / OfferingItemData ตามเดิม
 /// </summary>
 [CreateAssetMenu(fileName = "UIText", menuName = "GameJam/UI Text Data")]
 public class UITextData : ScriptableObject
@@ -23,8 +21,6 @@ public class UITextData : ScriptableObject
     public string turnLabel = "Turn {current} / {total}";
     [Tooltip("Placeholders: {turns}")]
     public string nextRitualInfo = "Next ritual: {turns} turns";
-    [Tooltip("Placeholders: {current}, {total}")]
-    public string incenseLabel = "Incense {current} / {total}";
 
     [Header("Buttons")]
     public string btnStartNight = "Start Night";
@@ -37,8 +33,8 @@ public class UITextData : ScriptableObject
     public string speedLabel = "{speed}x";
 
     [Header("Hints")]
-    [Tooltip("Placeholders: {placed}, {required}")]
-    public string startNightDisabledHint = "Place all shrines to start ({placed} / {required})";
+    public string startNightDisabledHint = "Place all shrines on the board to start";
+    public string tooltipEmptyTitle = "Ritual Guide";
     public string tooltipEmptyTip = "Hover over anything to see details. Hold Shift for more.";
     public string tooltipDetailHint = "Hold Shift for details";
     public string placeRotateHint = "Q / E: Rotate";

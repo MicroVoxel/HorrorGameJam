@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using UnityEngine;
 
 /// <summary>
@@ -90,7 +91,7 @@ public struct HexCoordinates : IEquatable<HexCoordinates>
         return new HexCoordinates(roundQ, roundR);
     }
 
-    // ---------- Neighbors / distance ----------
+    // ---------- Neighbors / distance / sorting ----------
     public HexCoordinates GetNeighbor(int directionIndex)
     {
         return this + Directions[NormalizeFacing(directionIndex)];
@@ -102,12 +103,25 @@ public struct HexCoordinates : IEquatable<HexCoordinates>
         return (Mathf.Abs(d.q) + Mathf.Abs(d.r) + Mathf.Abs(d.S)) / 2;
     }
 
+    /// <summary>เรียงรายการพิกัดจากใกล้ origin ไปไกล เสมอกันเรียงตาม Q แล้ว R (ให้ลำดับ Deterministic)</summary>
+    public static void SortByDistanceFrom(List<HexCoordinates> list, HexCoordinates origin)
+    {
+        if (list == null || list.Count <= 1) return;
+
+        list.Sort((a, b) =>
+        {
+            int da = origin.DistanceTo(a);
+            int db = origin.DistanceTo(b);
+            if (da != db) return da.CompareTo(db);
+            if (a.q != b.q) return a.q.CompareTo(b.q);
+            return a.r.CompareTo(b.r);
+        });
+    }
+
     // ---------- Rotation / facing ----------
 
-    /// <summary>ทำให้ Facing อยู่ในช่วง 0-5 (รองรับค่าติดลบ)</summary>
     public static int NormalizeFacing(int facing) => ((facing % 6) + 6) % 6;
 
-    /// <summary>หมุนพิกัด (ถือเป็น offset จากจุดกำเนิด) ไปทาง Facing ที่เพิ่มขึ้น steps ครั้ง ครั้งละ 60 องศา (ติดลบ = ย้อนกลับ)</summary>
     public HexCoordinates Rotate(int steps)
     {
         int n = NormalizeFacing(steps);
@@ -125,7 +139,6 @@ public struct HexCoordinates : IEquatable<HexCoordinates>
         return new HexCoordinates(rq, rr);
     }
 
-    /// <summary>ทิศขอบที่ใกล้กับเวกเตอร์ delta ที่สุด (ใช้หา Facing หันหน้าไปหาเป้า) delta = 0 คืน 0</summary>
     public static int NearestDirection(HexCoordinates delta)
     {
         Vector2 v = ToPlane(delta);
@@ -145,10 +158,8 @@ public struct HexCoordinates : IEquatable<HexCoordinates>
         return best;
     }
 
-    /// <summary>Facing ที่ชี้จากช่องนี้ไปหาช่องเป้าหมาย</summary>
     public int FacingTo(HexCoordinates target) => NearestDirection(target - this);
 
-    /// <summary>มุม Yaw (องศา) ของโมเดลที่หันตาม Facing เมื่อโมเดลหันหน้าไปทาง +Z ที่ Yaw 0</summary>
     public static float FacingToYaw(int facing) => 90f - 60f * NormalizeFacing(facing);
 
     private static Vector2 ToPlane(HexCoordinates h)

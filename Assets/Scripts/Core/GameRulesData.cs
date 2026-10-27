@@ -2,7 +2,7 @@ using System.Collections.Generic;
 using UnityEngine;
 
 /// <summary>
-/// ค่าตั้งต้นของกติกาเกมทั้งหมด (จำนวน Round/Turn, โควตา, ค่าบาลานซ์กลาง)
+/// ค่าตั้งต้นของกติกาเกมทั้งหมด (จำนวน Round/Turn, โควตา, ความจุกระเป๋า/มือการ์ด, ค่าบาลานซ์กลาง)
 /// ลากใส่ GameStateManager แล้วปรับค่าใน Inspector ได้โดยไม่ต้องแตะโค้ด
 /// 1 ก้านธูป = 1 Round
 /// </summary>
@@ -21,11 +21,15 @@ public class GameRulesData : ScriptableObject
     [Tooltip("Shrines the player must place during Dawn before the night can start.")]
     [SerializeField, Min(1)] private int requiredShrines = 2;
 
-    [Header("Cards")]
+    [Header("Cards & Backpack Limits")]
     [Tooltip("Spawner cards dealt at the start of Round 1 Planning (not during Dawn).")]
     [SerializeField, Min(0)] private int startingSpawnerCards = 2;
     [Tooltip("Cards drawn at the start of every Planning phase (safety net so the player never runs dry).")]
     [SerializeField, Min(0)] private int cardsDrawnPerRound = 1;
+    [Tooltip("Maximum cards the player can hold in hand at once.")]
+    [SerializeField, Min(1)] private int maxHandSize = 7;
+    [Tooltip("Maximum single-slot offerings in the 4x2 backpack.")]
+    [SerializeField, Min(1)] private int maxBackpackSlots = 8;
 
     [Header("Resolution Pacing")]
     [Tooltip("Playback speed options shown in the speed control.")]
@@ -50,12 +54,16 @@ public class GameRulesData : ScriptableObject
 
     [Header("Keywords")]
     [SerializeField, Min(0)] private int maxKeywordsPerUnit = 2;
+    [Tooltip("Maximum Last Breath chain explosions resolved per turn cleanup.")]
+    [SerializeField, Min(1)] private int maxChainPerCleanup = 64;
 
     [Header("Threat Towers (placed by the player)")]
     [Tooltip("Minimum number of path tiles that must fall inside the tower's range pattern.")]
     [SerializeField, Min(0)] private int minThreatPathTiles = 2;
     [Tooltip("Extra loot rolls per surviving Threat Tower at Round End.")]
     [SerializeField, Min(0)] private int threatLootBonusPerTower = 1;
+    [Tooltip("Chance for each Threat Tower bonus loot roll to grant an offering.")]
+    [SerializeField, Range(0f, 1f)] private float threatOfferingRollChance = 0.65f;
     [Tooltip("Extra card drop chance per surviving Threat Tower.")]
     [SerializeField, Range(0f, 1f)] private float threatCardChanceBonus = 0.10f;
     [Tooltip("Upper limit of the total bonus card chance.")]
@@ -77,9 +85,11 @@ public class GameRulesData : ScriptableObject
         return Mathf.Max(1, turnsPerRound[index]);
     }
 
-    // ---------- Cards ----------
+    // ---------- Cards & Backpack ----------
     public int StartingSpawnerCards => startingSpawnerCards;
     public int CardsDrawnPerRound => cardsDrawnPerRound;
+    public int MaxHandSize => Mathf.Max(1, maxHandSize);
+    public int MaxBackpackSlots => Mathf.Max(1, maxBackpackSlots);
 
     // ---------- Pacing ----------
     public int SpeedStepCount => speedSteps != null ? speedSteps.Length : 0;
@@ -103,10 +113,12 @@ public class GameRulesData : ScriptableObject
 
     // ---------- Keywords ----------
     public int MaxKeywordsPerUnit => maxKeywordsPerUnit;
+    public int MaxChainPerCleanup => Mathf.Max(1, maxChainPerCleanup);
 
     // ---------- Threat Towers ----------
     public int MinThreatPathTiles => minThreatPathTiles;
     public int ThreatLootBonusPerTower => threatLootBonusPerTower;
+    public float ThreatOfferingRollChance => threatOfferingRollChance;
     public float ThreatCardChanceBonus => threatCardChanceBonus;
     public float ThreatCardChanceCap => threatCardChanceCap;
 
@@ -114,6 +126,9 @@ public class GameRulesData : ScriptableObject
     private void OnValidate()
     {
         totalRounds = Mathf.Max(1, totalRounds);
+        maxHandSize = Mathf.Max(1, maxHandSize);
+        maxBackpackSlots = Mathf.Max(1, maxBackpackSlots);
+        maxChainPerCleanup = Mathf.Max(1, maxChainPerCleanup);
 
         if (turnsPerRound != null)
         {

@@ -65,9 +65,6 @@ PrefabInstance:
     - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: bed5852356956754aabd7741b7f422b1, type: 3}
       insertIndex: -1
       addedObject: {fileID: 4327468179149947796}
-    - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: bed5852356956754aabd7741b7f422b1, type: 3}
-      insertIndex: -1
-      addedObject: {fileID: 4585365825736228616}
   m_SourcePrefab: {fileID: 100100000, guid: bed5852356956754aabd7741b7f422b1, type: 3}
 --- !u!1 &1485680248583786850 stripped
 GameObject:
@@ -93,7 +90,7 @@ MonoBehaviour:
   currentHealth: 0
   defense: 0
   facing: 0
-  rotateModelWithFacing: 0
+  rotateModelWithFacing: 1
   facingYawOffset: 0
   altarDefenseBonus: 0
   altarDamageReduction: 0
@@ -110,7 +107,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 846ddc0804185434bb3bf5fb5fca6e8d, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::TowerAttackable
-  attackPattern: {fileID: 0}
+  attackPattern: {fileID: 11400000, guid: a07281b54a46c5d4599dc2730366de12, type: 2}
   baseDamage: 10
   actionsPerTurn: 1
   damageMultiplier: 1
@@ -131,19 +128,11 @@ MonoBehaviour:
   cardDropChance: 0.75
   possibleCards: []
   offeringDropChance: 0.65
-  possibleOfferings: []
+  possibleOfferings:
+  - {fileID: 11400000, guid: 04e96ae40efef6941adf76523250bcc5, type: 2}
+  - {fileID: 11400000, guid: c7fd61ec7f6ab4e4fa52b52cf8428c83, type: 2}
+  - {fileID: 11400000, guid: 445f3a890d1e57743b1fbc12cac653cd, type: 2}
+  - {fileID: 11400000, guid: cbba49d6a6f9769419751af99bb6154a, type: 2}
+  - {fileID: 11400000, guid: 63b89aa6a5f2079449620d78bcdb5f28, type: 2}
   dropOfferingOnHealthThresholds: 1
   healthThresholdStep: 0.25
---- !u!114 &4585365825736228616
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1485680248583786850}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 32557dabd0acb014f94177ed7dfd9e9c, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::AbilityHolder
-  baseAbilities: []

@@ -107,9 +107,12 @@ MonoBehaviour:
   towerName: Tower Shrine
   allowedGroundTypes: 01000000i
   requireAdjacentPath: 1
-  maxHealth: 120
+  maxHealth: 50
   currentHealth: 0
   defense: 2
+  facing: 0
+  rotateModelWithFacing: 0
+  facingYawOffset: 0
   altarDefenseBonus: 0
   altarDamageReduction: 0
   altarArmorStripped: 0

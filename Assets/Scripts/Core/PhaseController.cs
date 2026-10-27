@@ -1,11 +1,9 @@
 using System;
 using UnityEngine;
-using TMPro;
 
 /// <summary>
-/// คุมแสงและป้ายเฟสตาม GameState (แทนส่วนแสง/HUD ของ MoonPhaseManager เดิม)
+/// คุมเฉพาะแสงไฟในฉาก (Directional Light) และเสียงระฆังตาม GameState (ตัวเลือก 3B: ย้ายป้ายข้อความเฟสไปไว้ที่ TurnTrackerUI จุดเดียว)
 /// Dawn = แสงเช้า | Planning = Moonless (มืด) | Resolution/RoundEnd = Moonlit (แสงจันทร์)
-/// ไม่ได้ตัดสินสถานะเอง แค่ฟัง GameStateManager
 /// </summary>
 [DisallowMultipleComponent]
 public class PhaseController : SingletonBehaviour<PhaseController>
@@ -34,16 +32,12 @@ public class PhaseController : SingletonBehaviour<PhaseController>
     [Tooltip("Resolution and Round End (Moonlit) - the parade is awakened")]
     [SerializeField] private LightProfile moonlitLight = new LightProfile(new Color(0.7f, 0.8f, 1.0f, 1.0f), 1.1f);
 
-    [Header("HUD (Optional)")]
-    [SerializeField] private TextMeshProUGUI phaseStatusText;
-
     /// <summary>ฉากอยู่ในโหมดแสงจันทร์ (Resolution หรือ RoundEnd)</summary>
     public static bool IsMoonlitNow => GameStateManager.IsResolution || GameStateManager.IsRoundEnd;
 
     private void Start()
     {
         ApplyLightImmediate(GameStateManager.Current);
-        UpdateHUD(GameStateManager.Current);
 
         if (GameStateManager.Instance != null)
         {
@@ -74,8 +68,6 @@ public class PhaseController : SingletonBehaviour<PhaseController>
 
     private void HandleStateChanged(GameState newState)
     {
-        UpdateHUD(newState);
-
         if (newState == GameState.Resolution)
         {
             AudioManager.Bell();
@@ -100,13 +92,5 @@ public class PhaseController : SingletonBehaviour<PhaseController>
         LightProfile profile = GetProfile(state);
         directionalLight.color = profile.color;
         directionalLight.intensity = profile.intensity;
-    }
-
-    private void UpdateHUD(GameState state)
-    {
-        if (phaseStatusText != null)
-        {
-            phaseStatusText.text = UITextProvider.Text.GetPhaseLabel(state);
-        }
     }
 }

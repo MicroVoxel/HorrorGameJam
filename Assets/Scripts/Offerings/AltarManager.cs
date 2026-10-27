@@ -3,29 +3,49 @@ using System.Collections.Generic;
 using UnityEngine;
 
 /// <summary>
-/// สถานะของช่องวางของถวายแต่ละหมวดหมู่บนโต๊ะหมู่บูชา
-/// เก็บเฉพาะ "สถานะที่เปลี่ยนตามเวลา" (ไอเทม, อายุที่เหลือ, เน่าหรือยัง, จำนวน Round ที่เน่ามาแล้ว)
-/// หมายเหตุ: remainingDecayLoops นับเป็น Round (ชื่อฟิลด์คงไว้เพื่อไม่ให้ Scene/Asset เดิมพัง)
+/// สถานะของช่องวางของถวายแต่ละหมวดหมู่บนโต๊ะหมู่บูชา (เก็บผ่าน OfferingInstance ตัวเดียว)
 /// </summary>
 [Serializable]
 public class ActiveAltarSlotState
 {
     public OfferingType slotCategory;
-    public OfferingItemData currentItem;
-    public int remainingDecayLoops;
-    public bool isRotten;
-    [Tooltip("จำนวน Round ที่ผ่านไปแล้วหลังเริ่มเน่า (ใช้จำกัดผลเน่าแบบชั่วคราว เช่น Fortune Candle ข้าม 1 Round)")]
-    public int rottenRoundsElapsed;
+    public OfferingInstance offering;
 
-    public bool HasOffering => currentItem != null;
-
-    /// <summary>วางของสดลงช่อง (รีเซ็ตอายุและสถานะเน่า)</summary>
-    public void Place(OfferingItemData item)
+    public OfferingItemData currentItem
     {
-        currentItem = item;
-        remainingDecayLoops = item != null ? item.DecayLoops : 0;
-        isRotten = false;
-        rottenRoundsElapsed = 0;
+        get => offering.data;
+        set => offering.data = value;
+    }
+
+    public int remainingDecayLoops
+    {
+        get => offering.remainingDecayLoops;
+        set => offering.remainingDecayLoops = value;
+    }
+
+    public bool isRotten
+    {
+        get => offering.isRotten;
+        set => offering.isRotten = value;
+    }
+
+    public int rottenRoundsElapsed
+    {
+        get => offering.rottenRoundsElapsed;
+        set => offering.rottenRoundsElapsed = value;
+    }
+
+    public bool HasOffering => offering.IsValid;
+
+    /// <summary>วางของสดลงช่อง (รีเซ็ตอายุและสถานะเน่า หรือระบุอายุที่เหลือ)</summary>
+    public void Place(OfferingItemData item, int remainingRounds = -1)
+    {
+        offering = OfferingInstance.CreateFresh(item, remainingRounds);
+    }
+
+    public void Place(OfferingInstance instance)
+    {
+        offering = OfferingInstance.CreateFresh(instance.data, instance.remainingDecayLoops);
     }
 }
 
@@ -42,15 +62,11 @@ public class AltarManager : SingletonBehaviour<AltarManager>
 
     [Header("Global Entity Modifiers (Synchronized to Entities) — อ่านอย่างเดียว")]
     [SerializeField] private float globalEntityAttackMultiplier = 1.0f;
-    [SerializeField] private float globalEntitySpeedMultiplier = 1.0f;
     [SerializeField] private int globalEntityMoveBonus = 0;
-    [SerializeField] private bool isGlobalFrenzyActive = false;
     [SerializeField] private bool entityGrantLifedrain = false;
 
     [Header("Global Shrine & Tower Modifiers (Synchronized to Towers) — อ่านอย่างเดียว")]
-    [SerializeField] private float shrineDefenseBonus = 0.0f;
     [SerializeField] private float shrineDamageReduction = 0.0f;
-    [SerializeField] private float towerAttackIntervalMultiplier = 1.0f;
     [SerializeField] private bool shrineArmorStripped = false;
     [SerializeField] private float shrinePoisonDamagePerTurn = 0.0f;
     [SerializeField] private bool towerGrantDoubleStrike = false;
@@ -68,12 +84,9 @@ public class AltarManager : SingletonBehaviour<AltarManager>
     private bool subscribedToTurns;
 
     public float GlobalEntityAttackMultiplier => globalEntityAttackMultiplier;
-    public float GlobalEntitySpeedMultiplier => globalEntitySpeedMultiplier;
     public int GlobalEntityMoveBonus => globalEntityMoveBonus;
-    public bool IsGlobalFrenzyActive => isGlobalFrenzyActive;
     public bool EntityGrantLifedrain => entityGrantLifedrain;
 
-    public float ShrineDefenseBonus => shrineDefenseBonus;
     public float ShrineDamageReduction => shrineDamageReduction;
     public bool ShrineArmorStripped => shrineArmorStripped;
     public float ShrinePoisonDamagePerTurn => shrinePoisonDamagePerTurn;
@@ -160,11 +173,6 @@ public class AltarManager : SingletonBehaviour<AltarManager>
         }
     }
 
-    /// <summary>
-    /// Start of Turn ในเฟส Resolution:
-    /// 1. พิษจาก Savory ที่เน่าลด HP ศาลเจ้าทุกเทิร์น
-    /// 2. ของถวาย Sweet ที่ยังสดผลักผีหัวขบวนถอยหลังทุก N เทิร์น
-    /// </summary>
     private void HandleTurnStarted(int turn, int totalTurns)
     {
         if (!GameStateManager.IsResolution) return;
@@ -204,15 +212,6 @@ public class AltarManager : SingletonBehaviour<AltarManager>
         return null;
     }
 
-    /// <summary>
-    /// วางของถวายลงในช่องบูชา (ทำได้เฉพาะ Dawn / Planning)
-    /// หากมีของเดิมอยู่: ของที่ยัง "สด" จะถูกคืนเข้ากระเป๋า, ของที่ "เน่าแล้ว" จะสลายทิ้ง
-    /// </summary>
-    /// <summary>
-    /// วางของถวายลงในช่องบูชา (ทำได้เฉพาะ Dawn / Planning)
-    /// หากมีของเดิมอยู่: ของที่ยัง "สด" จะถูกคืนเข้ากระเป๋า (พร้อมอายุที่เหลือ), ของที่ "เน่าแล้ว" จะสลายทิ้ง
-    /// remainingRounds: อายุที่เหลือของชิ้นที่วาง (ของที่เคยอยู่บนแท่นแล้วถูกถอดคืนกระเป๋า) ไม่ระบุ = อายุเต็ม
-    /// </summary>
     public bool EquipOffering(OfferingItemData item, int remainingRounds = -1)
     {
         if (item == null) return false;
@@ -225,23 +224,14 @@ public class AltarManager : SingletonBehaviour<AltarManager>
             return false;
         }
 
-        OfferingItemData previousItem = slot.currentItem;
-        bool previousWasRotten = slot.isRotten;
-        int previousRemaining = slot.remainingDecayLoops; // FIX บัก 7: จำอายุเดิมก่อน Place รีเซ็ต
+        OfferingInstance previous = slot.offering;
 
-        slot.Place(item);
-
-        // FIX บัก 7: ของที่เคยวางไว้แล้วถูกถอด กลับมาวางต่อด้วยอายุเดิม ไม่ใช่เต็มอายุ
-        if (remainingRounds > 0)
-        {
-            slot.remainingDecayLoops = Mathf.Min(remainingRounds, item.DecayLoops);
-        }
-
+        slot.Place(item, remainingRounds);
         RecalculateAllGlobalMultipliers();
 
-        if (previousItem != null && !previousWasRotten && InventorySlotManager.Instance != null)
+        if (previous.IsValid && !previous.isRotten && InventorySlotManager.Instance != null)
         {
-            InventorySlotManager.Instance.AddItem(previousItem, previousRemaining);
+            InventorySlotManager.Instance.AddItem(previous);
         }
 
         if (item.SpawnRetaliationLanternOnFresh)
@@ -254,10 +244,6 @@ public class AltarManager : SingletonBehaviour<AltarManager>
         return true;
     }
 
-    /// <summary>
-    /// ลดอายุของถวายสดทุกช่อง 1 Round (เรียกอัตโนมัติตอนเข้า RoundEnd) ช่องที่อายุหมดจะเน่า
-    /// ส่วนช่องที่เน่าอยู่แล้วจะนับ rottenRoundsElapsed เพิ่ม 1 เพื่อปลดผลเน่าที่มีเวลาจำกัด (เช่น Fortune Candle ข้าม 1 Round)
-    /// </summary>
     public void TickAltarDecay()
     {
         bool stateChanged = false;
@@ -303,22 +289,15 @@ public class AltarManager : SingletonBehaviour<AltarManager>
         OnAltarStateChanged?.Invoke();
     }
 
-    /// <summary>
-    /// คำนวณผลรวมของทุกช่องใหม่ตามตาราง 4.6 แล้วกระจายให้ผีทุกตัวและสิ่งก่อสร้างทุกหลังบนกระดาน
-    /// </summary>
     public void RecalculateAllGlobalMultipliers()
     {
         EnsureRuntimeAbilities();
 
         float totalAtkMult = 1.0f;
-        float totalSpdMult = 1.0f;
         int totalMoveBonus = 0;
-        bool hasFrenzy = false;
         bool grantLifedrain = false;
 
-        float defenseBonus = 0.0f;
         float damagePassThrough = 1.0f;
-        float intervalMult = 1.0f;
         bool stripArmor = false;
         float poisonPerTurn = 0.0f;
         bool grantTowerDouble = false;
@@ -337,11 +316,8 @@ public class AltarManager : SingletonBehaviour<AltarManager>
 
             if (slot.isRotten)
             {
-                totalAtkMult *= item.RottenEntityAttackMultiplier;
-                totalSpdMult *= item.RottenEntitySpeedMultiplier;
                 totalMoveBonus += item.RottenEntityMoveBonus;
 
-                if (item.TriggersFrenzy) hasFrenzy = true;
                 if (item.RottenGrantEntityLifedrain) grantLifedrain = true;
                 if (item.StripShrineArmor) stripArmor = true;
 
@@ -356,9 +332,7 @@ public class AltarManager : SingletonBehaviour<AltarManager>
             else
             {
                 totalAtkMult *= item.FreshEntityAttackMultiplier;
-                defenseBonus += item.FreshShrineDefenseBonus;
                 damagePassThrough *= (1.0f - Mathf.Clamp01(item.FreshShrineDamageReductionPercent));
-                intervalMult *= Mathf.Max(0.1f, item.FreshTowerAttackSpeedMultiplier);
 
                 if (item.FreshGrantTowerDoubleStrike) grantTowerDouble = true;
                 if (item.FreshTowerIgnoreBlocking) ignoreBlocking = true;
@@ -372,14 +346,10 @@ public class AltarManager : SingletonBehaviour<AltarManager>
         }
 
         globalEntityAttackMultiplier = totalAtkMult;
-        globalEntitySpeedMultiplier = totalSpdMult;
         globalEntityMoveBonus = totalMoveBonus;
-        isGlobalFrenzyActive = hasFrenzy;
         entityGrantLifedrain = grantLifedrain;
 
-        shrineDefenseBonus = defenseBonus;
         shrineDamageReduction = Mathf.Clamp(1.0f - damagePassThrough, 0.0f, 0.8f);
-        towerAttackIntervalMultiplier = intervalMult;
         shrineArmorStripped = stripArmor;
         shrinePoisonDamagePerTurn = poisonPerTurn;
         towerGrantDoubleStrike = grantTowerDouble;
@@ -408,19 +378,13 @@ public class AltarManager : SingletonBehaviour<AltarManager>
         }
     }
 
-    /// <summary>
-    /// ใส่ผลของโต๊ะบูชาให้ผี 1 ตัว (เรียกตอนเกิดจาก EntityBase.SyncWithAltarManager และเมื่อโต๊ะบูชาเปลี่ยน)
-    /// - ตัวคูณโจมตี (รวม Fragrance ตอนสด x0.8), ความเร็ว, Frenzy
-    /// - โบนัสระยะเดิน +Move (Berserk จาก Drink ที่เน่า)
-    /// - Keyword Lifedrain จาก Drink ที่เน่า
-    /// </summary>
     public void ApplyEffectsToEntity(EntityBase entity)
     {
         if (entity == null || entity.IsDead) return;
 
         EnsureRuntimeAbilities();
 
-        entity.ApplyGlobalMultipliers(globalEntityAttackMultiplier, globalEntitySpeedMultiplier, isGlobalFrenzyActive);
+        entity.ApplyGlobalMultipliers(globalEntityAttackMultiplier, 1.0f, false);
         entity.SetAltarMoveBonus(globalEntityMoveBonus);
 
         AbilityHolder holder = entity.Abilities != null ? entity.Abilities : entity.GetComponent<AbilityHolder>();
@@ -449,11 +413,6 @@ public class AltarManager : SingletonBehaviour<AltarManager>
         }
     }
 
-    /// <summary>
-    /// ใส่ผลของโต๊ะบูชาให้สิ่งก่อสร้าง 1 หลัง (เรียกอัตโนมัติจาก TowerBase.OnPlaced สำหรับป้อมที่วางทีหลัง)
-    /// - ศาลเจ้า (TowerObjective): โบนัสเกราะ + ลดดาเมจ (Savory สด x0.5) / เกราะถูกกัดกร่อนเป็น 0 (Savory เน่า)
-    /// - ป้อมยิง (TowerAttackable): ความถี่ในการยิง และ Keyword Double Strike (Drink สด)
-    /// </summary>
     public void ApplyEffectsToTower(TowerBase tower)
     {
         if (tower == null || tower.IsDead) return;
@@ -462,10 +421,10 @@ public class AltarManager : SingletonBehaviour<AltarManager>
 
         if (tower.GetComponent<TowerObjective>() != null)
         {
-            tower.SetAltarModifiers(shrineDefenseBonus, shrineDamageReduction, shrineArmorStripped);
+            tower.SetAltarModifiers(0f, shrineDamageReduction, shrineArmorStripped);
         }
 
-        if (tower.TryGetComponent(out TowerAttackable attacker))
+        if (tower.TryGetComponent(out TowerAttackable _))
         {
             AbilityHolder holder = tower.Abilities != null ? tower.Abilities : tower.GetComponent<AbilityHolder>();
             if (holder != null)
@@ -478,14 +437,6 @@ public class AltarManager : SingletonBehaviour<AltarManager>
                 {
                     holder.Grant(doubleStrikeData, true);
                 }
-
-                attacker.SetFireRateMultiplier(1.0f / Mathf.Max(0.1f, towerAttackIntervalMultiplier));
-            }
-            else
-            {
-                // Fallback กรณี Prefab ป้อมยังไม่ได้ติด AbilityHolder: บวก +1 action ต่อเทิร์นผ่าน fireRateMultiplier
-                float baseRate = 1.0f / Mathf.Max(0.1f, towerAttackIntervalMultiplier);
-                attacker.SetFireRateMultiplier(towerGrantDoubleStrike ? baseRate + 1.0f : baseRate);
             }
         }
     }
@@ -535,10 +486,6 @@ public class AltarManager : SingletonBehaviour<AltarManager>
         }
     }
 
-    /// <summary>
-    /// ค้นหาผีที่อยู่หน้าสุดของขบวน (SortKey น้อยสุด / เดินไกลสุด)
-    /// ถ้า requireMutatable = true จะหาตัวหน้าสุดที่มี EntityMutatable และยังไม่ครบเพดานกลายพันธุ์
-    /// </summary>
     private static EntityWalkable FindLeadWalkable(bool requireMutatable)
     {
         IReadOnlyList<EntityBase> entities = EntityRegistry.ActiveEntities;
@@ -601,10 +548,6 @@ public class AltarManager : SingletonBehaviour<AltarManager>
         return runtimeLifedrainAbility;
     }
 
-    /// <summary>
-    /// เสกป้อมโคมไฟหินบนช่อง Ground รอบศาลเจ้าที่ยังอยู่ และหันเข้าหาทิศที่มีช่อง Path มากที่สุดอัตโนมัติ
-    /// ใช้ GameRandom ตามกติกา Seeded RNG ของ v2
-    /// </summary>
     private void TrySpawnRetaliationLantern()
     {
         if (retaliationLanternPrefab == null) return;

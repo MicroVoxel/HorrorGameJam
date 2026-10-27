@@ -10,11 +10,11 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: b1e5f952eeb7a9b4baebb6d69b894dc9, type: 3}
-  m_Name: Card PineForest
+  m_Name: Card Cylinder
   m_EditorClassIdentifier: Assembly-CSharp::CardData
   cardId: card_tower
-  cardName: PineForest
-  description: The pine tree forest.
+  cardName: cylinder
+  description: Just A Cylinder
   icon: {fileID: 10907, guid: 0000000000000000f000000000000000, type: 0}
   frameThemeColor: {r: 1, g: 1, b: 1, a: 1}
-  towerPrefab: {fileID: 0}
+  towerPrefab: {fileID: 8586138108035733693, guid: f588c673d26c96c4e8c540501192475b, type: 3}

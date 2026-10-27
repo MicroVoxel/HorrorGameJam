@@ -3,8 +3,7 @@ using System.Collections.Generic;
 using UnityEngine;
 
 /// <summary>
-/// Static Registry สำหรับเก็บรายการยูนิต (EntityBase) ทั้งหมดที่มีชีวิตอยู่ในฉากแบบ Real-time
-/// ช่วยให้ป้อม (TowerAttackable) และระบบเช็กการสูญพันธุ์ (Extinction) ค้นหายูนิตได้ทันทีโดยไม่ต้องเรียก FindObjectsByType
+/// Static Registry สำหรับเก็บรายการยูนิต (EntityBase) ทั้งหมดที่มีชีวิตอยู่ในฉาก
 /// ผีที่ตายจะถูกถอดออกทันทีใน EntityBase.Die() ไม่รอ Destroy ท้ายเฟรม
 /// </summary>
 public static class EntityRegistry
@@ -38,34 +37,6 @@ public static class EntityRegistry
         {
             activeEntities.Remove(entity);
         }
-    }
-
-    /// <summary>
-    /// ค้นหายูนิตที่อยู่ใกล้ตำแหน่งที่กำหนดมากที่สุดภายในระยะยิง
-    /// </summary>
-    public static EntityBase GetClosestEntity(Vector3 fromPosition, float maxRange)
-    {
-        EntityBase closest = null;
-        float maxRangeSqr = maxRange * maxRange;
-        float minSqrDist = maxRangeSqr;
-
-        for (int i = activeEntities.Count - 1; i >= 0; i--)
-        {
-            EntityBase candidate = activeEntities[i];
-            if (candidate == null || candidate.IsDead)
-            {
-                continue;
-            }
-
-            float sqrDist = (candidate.Position - fromPosition).sqrMagnitude;
-            if (sqrDist <= minSqrDist)
-            {
-                minSqrDist = sqrDist;
-                closest = candidate;
-            }
-        }
-
-        return closest;
     }
 
     public static void ClearAll()

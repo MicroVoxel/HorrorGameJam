@@ -3,10 +3,6 @@ using UnityEngine;
 
 /// <summary>
 /// ประมวลผล Keyword ที่ต้องทำในขั้น Cleanup: Last Breath
-/// ผี/ป้อมที่ตายส่งคำขอเข้าคิว (AbilityHolder) แล้ว TurnManager เรียก ResolvePending ก่อนยิง OnTurnCleanup
-/// เพื่อให้ Last Breath ระเบิดเสร็จก่อนที่ Victory / Extinction จะตัดสิน
-/// ตัวที่ตายจาก Last Breath ก็เข้าคิวต่อเป็นลูกโซ่ (จำกัดไม่เกิน 64 ครั้งต่อ Cleanup)
-/// ต้องมี 1 ตัวในซีนเกม (วางบน GameObject เดียวกับ TurnManager ได้)
 /// </summary>
 [DisallowMultipleComponent]
 public class AbilityResolver : SingletonBehaviour<AbilityResolver>
@@ -20,7 +16,7 @@ public class AbilityResolver : SingletonBehaviour<AbilityResolver>
         public string sourceName;
     }
 
-    private const int MaxChainPerCleanup = 64;
+    private const int FallbackMaxChainPerCleanup = 64;
 
     private readonly Queue<LastBreathRequest> pending = new Queue<LastBreathRequest>();
     private readonly List<HexCoordinates> tiles = new List<HexCoordinates>(32);
@@ -28,7 +24,6 @@ public class AbilityResolver : SingletonBehaviour<AbilityResolver>
 
     // ---------- Static helpers ----------
 
-    /// <summary>true ถ้า component นี้อยู่บน GameObject ที่มี AbilityHolder และมี Keyword นั้น</summary>
     public static bool HasKeyword(Component component, AbilityKeyword keyword)
     {
         return component != null
@@ -36,7 +31,6 @@ public class AbilityResolver : SingletonBehaviour<AbilityResolver>
                && holder.Has(keyword);
     }
 
-    /// <summary>ส่งคำขอ Last Breath เข้าคิว (fromSpirit = true: ผีตาย ระเบิดใส่ฝั่งศาล / false: ป้อมตาย ระเบิดใส่ผี)</summary>
     public static void QueueLastBreath(AbilityData data, HexCoordinates origin, int facing, bool fromSpirit, string sourceName)
     {
         if (data == null) return;
@@ -57,8 +51,6 @@ public class AbilityResolver : SingletonBehaviour<AbilityResolver>
         });
     }
 
-    // FIX บัก 4: TurnManager เรียกก่อนยิง OnTurnCleanup เพื่อให้ Last Breath จบก่อนตัดสินแพ้/ชนะ
-    /// <summary>ประมวลผลคิว Last Breath ที่ค้างอยู่ทั้งหมด (รวมลูกโซ่) ปลอดภัยแม้ไม่มี AbilityResolver ในซีน</summary>
     public static void ResolvePending(TurnContext ctx)
     {
         if (Instance != null) Instance.ProcessPending(ctx);
@@ -89,7 +81,6 @@ public class AbilityResolver : SingletonBehaviour<AbilityResolver>
 
     private void HandleStateChanged(GameState state)
     {
-        // คำขอที่ค้างจากเฟสอื่น (เช่น เกมจบกลางเทิร์น) ไม่ต้องยกไป Round ถัดไป
         if (state != GameState.Resolution) pending.Clear();
     }
 
@@ -97,8 +88,12 @@ public class AbilityResolver : SingletonBehaviour<AbilityResolver>
 
     private void ProcessPending(TurnContext ctx)
     {
+        int maxChain = GameStateManager.Instance != null
+            ? GameStateManager.Instance.Rules.MaxChainPerCleanup
+            : FallbackMaxChainPerCleanup;
+
         int guard = 0;
-        while (pending.Count > 0 && guard < MaxChainPerCleanup)
+        while (pending.Count > 0 && guard < maxChain)
         {
             guard++;
             Resolve(pending.Dequeue(), ctx);
@@ -126,15 +121,7 @@ public class AbilityResolver : SingletonBehaviour<AbilityResolver>
             tiles.Add(origin);
         }
 
-        // เรียงใกล้ไปไกล แล้ว q, r เพื่อให้ลำดับการตายคงที่
-        tiles.Sort((a, b) =>
-        {
-            int da = origin.DistanceTo(a);
-            int db = origin.DistanceTo(b);
-            if (da != db) return da.CompareTo(db);
-            if (a.Q != b.Q) return a.Q.CompareTo(b.Q);
-            return a.R.CompareTo(b.R);
-        });
+        HexCoordinates.SortByDistanceFrom(tiles, origin);
 
         float raw = Mathf.Floor(req.data.LastBreathDamage);
         ctx?.Log($"{req.sourceName} bursts");

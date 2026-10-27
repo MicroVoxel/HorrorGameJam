@@ -46,7 +46,6 @@ public static class TurnActorRegistry
             ITurnActor actor = actors[i];
             if (!IsUsable(actor) || actor.Group != group) continue;
 
-            // Insertion sort แบบ Stable
             int insertAt = buffer.Count;
             while (insertAt > 0 && buffer[insertAt - 1].SortKey > actor.SortKey)
             {
@@ -76,6 +75,15 @@ public static class TurnActorRegistry
         }
 
         return false;
+    }
+
+    /// <summary>
+    /// นิยามกลางของทั้งเกมว่า "บนกระดานยังมีผีเดินอยู่ หรือยังมีรังผีที่เสกผีต่อได้หรือไม่"
+    /// ใช้ร่วมกันระหว่าง TurnManager (เช็กจบ Resolution เร็ว) และ ParadeExtinctionChecker (เช็กแพ้สูญพันธุ์)
+    /// </summary>
+    public static bool HasActiveParadeOrSpawner()
+    {
+        return EntityRegistry.ActiveCount > 0 || AnyActive(TurnActorGroup.Spawner);
     }
 
     /// <summary>กันกรณี MonoBehaviour ถูก Destroy ไปแล้วแต่ยังค้างในทะเบียน</summary>

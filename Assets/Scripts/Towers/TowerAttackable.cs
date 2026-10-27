@@ -4,12 +4,6 @@ using UnityEngine;
 
 /// <summary>
 /// ป้อมฝั่งศาล (เช่น โคมไฟหิน) แบบเทิร์น (ITurnActor, กลุ่ม Tower) ไม่มี Update()
-/// - 1 action ต่อเทิร์น (ของถวายสดที่ "ยิงถี่ขึ้น" เพิ่มเป็นเศษสะสม: ครบ 1 = +1 action)
-/// - เลือกเป้าหมายจากช่องใน Range Pattern ที่หันตาม Facing: ผีหัวขบวนก่อน เสมอกันสุ่มด้วย GameRandom
-/// - ทำดาเมจทุกผีในช่อง Hit Pattern เรียงจากใกล้ไปไกล
-///
-/// 4B Keyword: Quick Attack (IQuickActor), Double Strike (+1 action), Decoy (ผีที่มี Decoy ใน Range ต้องถูกเลือกก่อน),
-///             Armor Piercing, Lifedrain, Overrun (ส่งดาเมจที่เกินให้ผีถัดไปในช่อง Hit หรือผีหัวขบวนที่เหลือใน Range)
 /// </summary>
 [DisallowMultipleComponent]
 [RequireComponent(typeof(TowerBase))]
@@ -56,7 +50,6 @@ public class TowerAttackable : MonoBehaviour, IQuickActor
 
     private void OnEnable()
     {
-        // ลงทะเบียนเฉพาะตอนวางลงกระดานจริง (Ghost Preview จะไม่ถูกนับ)
         if (towerBase != null)
         {
             towerBase.OnPlacedOnBoard += HandlePlacedOnBoard;
@@ -84,11 +77,9 @@ public class TowerAttackable : MonoBehaviour, IQuickActor
 
         actionsRemaining = Mathf.Max(1, actionsPerTurn) + extra + (Has(AbilityKeyword.DoubleStrike) ? 1 : 0);
 
-        // Fortune Candle ที่เน่า: ป้อมทุกหลังข้าม action ทั้ง Round (Quick Step ก็ข้ามด้วย)
         if (AltarManager.Instance != null && AltarManager.Instance.TowersSkipActive) actionsRemaining = 0;
     }
 
-    /// <summary>Quick Step: ป้อมที่มี Quick Attack ใช้ 1 action ก่อน Entity Step (ไม่มีเป้าหมาย = ไม่เสีย action)</summary>
     public IEnumerator ExecuteQuickAction(TurnContext ctx)
     {
         if (!IsActorActive || actionsRemaining <= 0 || !Has(AbilityKeyword.QuickAttack)) yield break;
@@ -135,7 +126,6 @@ public class TowerAttackable : MonoBehaviour, IQuickActor
             EntityBase entity = tile.CurrentEntity;
             bool decoy = AbilityResolver.HasKeyword(entity, AbilityKeyword.Decoy);
 
-            // Decoy ใน Range ต้องถูกเลือกก่อนเสมอ
             if (bestIsDecoy && !decoy) continue;
 
             int key = entity.TryGetComponent(out EntityWalkable walkable) ? walkable.SortKey : int.MaxValue - 1;
@@ -185,116 +175,27 @@ public class TowerAttackable : MonoBehaviour, IQuickActor
 
         if (animate) yield return ctx.Pause(flashSeconds);
 
-        ApplyHits(ctx, targetCoord);
+        CombatResolver.AttackerSpec spec = new CombatResolver.AttackerSpec
+        {
+            attackerName = towerBase.TowerName,
+            origin = origin,
+            pattern = attackPattern,
+            scaledBaseDamage = baseDamage * damageMultiplier,
+            fromSpirit = false,
+            canTargetLanterns = true,
+            armorPiercing = Has(AbilityKeyword.ArmorPiercing),
+            overrun = Has(AbilityKeyword.Overrun),
+            lifedrain = Has(AbilityKeyword.Lifedrain),
+            selfTower = towerBase
+        };
+
+        CombatResolver.ApplyHits(ctx, spec, targetCoord, rangeTiles, hitTiles);
         RangeIndicator.Hide(this);
-    }
-
-    private void ApplyHits(TurnContext ctx, HexCoordinates targetCoord)
-    {
-        LoopPathManager board = LoopPathManager.Instance;
-        if (board == null) return;
-
-        bool armorPiercing = Has(AbilityKeyword.ArmorPiercing);
-        bool overrun = Has(AbilityKeyword.Overrun);
-        float carry = 0f;
-
-        for (int i = 0; i < hitTiles.Count; i++)
-        {
-            if (!board.TryGetTileAt(hitTiles[i], out HexTile tile)) continue;
-
-            float falloff = attackPattern.GetDamageMultiplier(targetCoord, hitTiles[i]);
-            float raw = Mathf.Floor(baseDamage * damageMultiplier * falloff);
-
-            EntityBase entity = tile.CurrentEntity;
-            if (entity != null && !entity.IsDead)
-            {
-                DamageEntity(ctx, entity, raw, armorPiercing, out float overkill);
-
-                if (overrun)
-                {
-                    float incoming = carry;
-                    carry = overkill;
-
-                    if (incoming > 0f)
-                    {
-                        if (!entity.IsDead)
-                        {
-                            DamageEntity(ctx, entity, incoming, true, out float overkillFromCarry);
-                            carry = overkillFromCarry;
-                        }
-                        else
-                        {
-                            carry += incoming;
-                        }
-                    }
-                }
-            }
-
-            if (attackPattern.FriendlyFire)
-            {
-                TowerBase other = tile.CurrentTower;
-                if (other != null && other != towerBase && !other.IsDead && other.IsShrineSide)
-                {
-                    float dealt = other.ApplyDamage(raw, false);
-                    ctx.Log($"{towerBase.TowerName} hits {other.TowerName} for {dealt:0}");
-                }
-            }
-        }
-
-        if (overrun && carry > 0f) ApplyOverrunToRange(ctx, board, carry);
-    }
-
-    /// <summary>Overrun: ไม่มีผีถัดไปในช่อง Hit ส่งดาเมจที่เหลือให้ผีหัวขบวนที่ยังไม่ถูกตีใน Range</summary>
-    private void ApplyOverrunToRange(TurnContext ctx, LoopPathManager board, float carry)
-    {
-        EntityBase best = null;
-        int bestKey = int.MaxValue;
-
-        for (int i = 0; i < rangeTiles.Count; i++)
-        {
-            if (hitTiles.Contains(rangeTiles[i])) continue;
-            if (!board.TryGetTileAt(rangeTiles[i], out HexTile tile) || !tile.HasEntity) continue;
-
-            EntityBase entity = tile.CurrentEntity;
-            int key = entity.TryGetComponent(out EntityWalkable walkable) ? walkable.SortKey : int.MaxValue - 1;
-
-            if (best == null || key < bestKey)
-            {
-                best = entity;
-                bestKey = key;
-            }
-        }
-
-        if (best != null) DamageEntity(ctx, best, carry, true, out _);
-    }
-
-    private float DamageEntity(TurnContext ctx, EntityBase entity, float raw, bool ignoreDefense, out float overkill)
-    {
-        float dealt = entity.ApplyDamage(raw, ignoreDefense, out overkill);
-
-        if (dealt > 0f)
-        {
-            ctx.Log($"{towerBase.TowerName} hits {entity.EntityName} for {dealt:0}");
-            if (Has(AbilityKeyword.Lifedrain)) towerBase.Heal(dealt);
-        }
-        else
-        {
-            ctx.Log($"{entity.EntityName} blocks {towerBase.TowerName}");
-        }
-
-        return dealt;
     }
 
     // ---------- Altar hooks ----------
 
-    /// <summary>ปรับตัวคูณความแรงและความถี่ในการยิง</summary>
-    public void SetBuffMultipliers(float dmgMult, float rateMult)
-    {
-        damageMultiplier = Mathf.Max(0.1f, dmgMult);
-        fireRateMultiplier = Mathf.Max(0.1f, rateMult);
-    }
-
-    /// <summary>ปรับเฉพาะความถี่ในการยิง (เรียกจาก AltarManager) เช่น 1.33 = ได้ action เพิ่มทุก 3 เทิร์น</summary>
+    /// <summary>ปรับความถี่ในการยิง (เรียกจาก AltarManager) เช่น 1.33 = ได้ action เพิ่มทุก 3 เทิร์น</summary>
     public void SetFireRateMultiplier(float rateMult)
     {
         fireRateMultiplier = Mathf.Max(0.1f, rateMult);

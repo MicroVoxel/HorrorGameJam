@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Text;
 using UnityEngine;
 using UnityEngine.UI;
@@ -7,10 +8,7 @@ using TMPro;
 
 /// <summary>
 /// UI ช่องเก็บของเดี่ยว (4x2 Backpack) v2 (GDD 6.2 & 6.5):
-/// - ไม่มี emoji ใช้ข้อความจาก UITextProvider.Text
-/// - ช่องซ้ายสุด (SlotIndex == 0) แสดงเครื่องหมายเตือน "ชิ้นถัดไปที่จะถูกดันทิ้งเมื่อกระเป๋าเต็ม"
-/// - Hover แสดงรายละเอียดของสด/เน่าใน TooltipPanel และล็อกคำอธิบายระหว่างลาก
-/// - แจ้งเตือน OnDraggingItemChanged เพื่อให้ AltarSlotUI เรืองแสงเฉพาะช่องที่ตรงหมวดหมู่
+/// BuildOfferingEffectsDetail สร้างข้อความจากฟิลด์จริงใน OfferingItemData (ไม่ผูกตายตัวกับหมวดหมู่)
 /// </summary>
 [DisallowMultipleComponent]
 public class InventorySlotUI : MonoBehaviour,
@@ -169,7 +167,6 @@ public class InventorySlotUI : MonoBehaviour,
 
         UITextData t = UITextProvider.Text;
 
-        // FIX บัก 7: แสดงอายุที่เหลือจริงของชิ้นนี้ (ของที่ถอดจากแท่นอาจเหลือน้อยกว่าเต็มอายุ)
         int remaining = InventorySlotManager.Instance != null
             ? InventorySlotManager.Instance.GetRemainingAt(slotIndex)
             : currentItem.DecayLoops;
@@ -182,50 +179,44 @@ public class InventorySlotUI : MonoBehaviour,
         return true;
     }
 
+    /// <summary>สร้างคำอธิบายผลตอนสด/ตอนเน่าจากค่าที่ตั้งไว้จริงใน OfferingItemData</summary>
     public static string BuildOfferingEffectsDetail(OfferingItemData item, string extraNote = null)
     {
         if (item == null) return string.Empty;
 
-        StringBuilder sb = new StringBuilder();
-        sb.Append("Fresh: ");
-        switch (item.Category)
-        {
-            case OfferingType.Drink:
-                sb.Append("All towers gain Double Strike.");
-                break;
-            case OfferingType.Savory:
-                sb.Append($"Shrine damage taken x{1f - item.FreshShrineDamageReductionPercent:0.##}.");
-                break;
-            case OfferingType.Sweet:
-                sb.Append($"Pushes lead spirit back {item.FreshPushLeadSpiritTiles} tile(s) every {item.FreshPushEveryNTurns} turns.");
-                break;
-            case OfferingType.Fragrance:
-                sb.Append($"Spirit attack damage x{item.FreshEntityAttackMultiplier:0.##}.");
-                break;
-            case OfferingType.Utility:
-                sb.Append("Tower patterns ignore unit blocking.");
-                break;
-        }
+        List<string> freshParts = new List<string>(4);
+        if (item.FreshGrantTowerDoubleStrike)
+            freshParts.Add("All towers gain Double Strike");
+        if (item.FreshShrineDamageReductionPercent > 0f)
+            freshParts.Add($"Shrine damage taken x{1f - item.FreshShrineDamageReductionPercent:0.##}");
+        if (item.FreshPushLeadSpiritTiles > 0)
+            freshParts.Add($"Pushes lead spirit back {item.FreshPushLeadSpiritTiles} tile(s) every {item.FreshPushEveryNTurns} turn(s)");
+        if (!Mathf.Approximately(item.FreshEntityAttackMultiplier, 1f))
+            freshParts.Add($"Spirit attack damage x{item.FreshEntityAttackMultiplier:0.##}");
+        if (item.FreshTowerIgnoreBlocking)
+            freshParts.Add("Tower patterns ignore unit blocking");
+        if (item.SpawnRetaliationLanternOnFresh)
+            freshParts.Add("Spawns a retaliation lantern");
 
-        sb.Append("\nRotten: ");
-        switch (item.Category)
-        {
-            case OfferingType.Drink:
-                sb.Append($"All spirits gain Lifedrain and +{item.RottenEntityMoveBonus} Move.");
-                break;
-            case OfferingType.Savory:
-                sb.Append($"Shrine DEF becomes 0 and takes {item.RottenShrinePoisonDamagePerTurn:0} poison damage per turn.");
-                break;
-            case OfferingType.Sweet:
-                sb.Append("Lead mutatable spirit mutates immediately.");
-                break;
-            case OfferingType.Fragrance:
-                sb.Append($"All tower pattern sizes {item.RottenTowerPatternSizeDelta}.");
-                break;
-            case OfferingType.Utility:
-                sb.Append($"All towers skip actions for {item.RottenTowersSkipDurationRounds} round(s).");
-                break;
-        }
+        List<string> rottenParts = new List<string>(4);
+        if (item.RottenGrantEntityLifedrain)
+            rottenParts.Add("All spirits gain Lifedrain");
+        if (item.RottenEntityMoveBonus > 0)
+            rottenParts.Add($"All spirits gain +{item.RottenEntityMoveBonus} Move");
+        if (item.StripShrineArmor)
+            rottenParts.Add("Shrine DEF becomes 0");
+        if (item.RottenShrinePoisonDamagePerTurn > 0f)
+            rottenParts.Add($"Shrines take {item.RottenShrinePoisonDamagePerTurn:0} poison damage per turn");
+        if (item.RottenMutateLeadSpiritImmediately)
+            rottenParts.Add("Lead mutatable spirit mutates immediately");
+        if (item.RottenTowerPatternSizeDelta != 0)
+            rottenParts.Add($"All tower pattern sizes {item.RottenTowerPatternSizeDelta:+#;-#;0}");
+        if (item.RottenTowersSkipRound)
+            rottenParts.Add($"All towers skip actions for {item.RottenTowersSkipDurationRounds} round(s)");
+
+        StringBuilder sb = new StringBuilder();
+        sb.Append("Fresh: ").Append(freshParts.Count > 0 ? string.Join("; ", freshParts) + "." : "None.");
+        sb.Append("\nRotten: ").Append(rottenParts.Count > 0 ? string.Join("; ", rottenParts) + "." : "None.");
 
         if (!string.IsNullOrEmpty(extraNote))
         {

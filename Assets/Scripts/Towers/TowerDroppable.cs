@@ -3,8 +3,7 @@ using UnityEngine;
 
 /// <summary>
 /// คอมโพเนนต์สำหรับติดบนป้อมโคมไฟหินหรือศาลเจ้า (TowerBase)
-/// เมื่อป้อมถูกทำลาย หรือเมื่อเลือดศาลเจ้าลดลงทุกๆ ช่วงที่กำหนด (Chip Damage Loot)
-/// v2 (4C): ใช้ GameRandom (Seeded RNG) และส่งของดรอปเข้า LootStash เพื่อแจกตอน RoundEnd
+/// เรียกใช้ LootStash.TryRollDrops ร่วมกับ EntityDroppable
 /// </summary>
 [DisallowMultipleComponent]
 [RequireComponent(typeof(TowerBase))]
@@ -63,39 +62,17 @@ public class TowerDroppable : MonoBehaviour
         while (normalized <= nextThresholdNormalized && nextThresholdNormalized > 0.01f)
         {
             nextThresholdNormalized -= healthThresholdStep;
-            GrantRandomOffering("Shrine Chip Damage");
+            LootStash.TryRollOfferingDrop(possibleOfferings, 1f, "Shrine Chip Damage");
         }
     }
 
     private void HandleTowerDestroyed(TowerBase destroyedTower)
     {
-        if (offeringDropChance > 0f && GameRandom.Chance(offeringDropChance))
-        {
-            GrantRandomOffering("Tower Destroyed");
-        }
-
-        if (cardDropChance > 0f && possibleCards != null && possibleCards.Count > 0)
-        {
-            float effectiveCardChance = Mathf.Clamp01(cardDropChance + LootStash.GetThreatCardChanceBonus());
-            if (GameRandom.Chance(effectiveCardChance))
-            {
-                CardData card = GameRandom.Pick(possibleCards);
-                if (card != null)
-                {
-                    LootStash.StashCard(card, "Tower Destroyed");
-                }
-            }
-        }
-    }
-
-    private void GrantRandomOffering(string reason)
-    {
-        if (possibleOfferings == null || possibleOfferings.Count == 0) return;
-
-        OfferingItemData item = GameRandom.Pick(possibleOfferings);
-        if (item != null)
-        {
-            LootStash.StashOffering(item, reason);
-        }
+        LootStash.TryRollDrops(
+            possibleOfferings,
+            offeringDropChance,
+            possibleCards,
+            cardDropChance,
+            "Tower Destroyed");
     }
 }
